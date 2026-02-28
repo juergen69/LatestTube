@@ -271,7 +271,7 @@
             console.log(`YouTube API: Fetching channel info for handle ${handle}`);
             const data = await apiRequest(url, `fetchChannelInfo(${handle})`, 'channels.list', 1);
 
-            if (data.items && data.items.length > 0) {
+            if (data.items?.length > 0) {
                 const item = data.items[0];
                 results.push({
                     channelId: item.id,
@@ -473,7 +473,7 @@
         let channelInfo;
 
         // Use cached channel info if available (saves 1 quota unit)
-        if (cachedChannelInfo && cachedChannelInfo.uploadsPlaylistId) {
+        if (cachedChannelInfo?.uploadsPlaylistId) {
             channelInfo = cachedChannelInfo;
             console.log(`YouTube API: Using cached channel info for ${channelId} (saved 1 quota unit)`);
         } else {

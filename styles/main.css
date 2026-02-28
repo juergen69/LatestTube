@@ -777,12 +777,12 @@
 
         .status-message.success {
             background-color: rgba(76, 175, 80, 0.2);
-            color: #4caf50;
+            color: #2e7d32;
         }
 
         .status-message.error {
             background-color: rgba(255, 68, 68, 0.2);
-            color: #ff6666;
+            color: #c62828;
         }
 
         @keyframes fadeIn {
@@ -1388,12 +1388,12 @@
         }
 
         .refresh-status.success {
-            color: #4caf50;
+            color: #2e7d32;
             border-color: rgba(76, 175, 80, 0.3);
         }
 
         .refresh-status.error {
-            color: var(--accent);
+            color: #c62828;
             border-color: rgba(255, 68, 68, 0.3);
         }
 
