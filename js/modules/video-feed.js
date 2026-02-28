@@ -519,8 +519,8 @@
         cards.forEach(card => {
             const videoId = card.dataset.videoId;
             if (!videoId) return;
-            globalThis.LatestTube.DB.videos.get(videoId)?.then(video => {
-                if (!video || video.channelId !== channelId) return;
+            globalThis.LatestTube.DB.videos.get(videoId).then(video => {
+                if (video?.channelId !== channelId) return;
                 updateVideoCard(videoId, { tags });
             });
         });

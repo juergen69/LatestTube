@@ -133,7 +133,7 @@
     <!-- ========================================
          Settings Modal
          ======================================== -->
-    <div class="modal-overlay" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <dialog class="modal-overlay" id="settings-modal" aria-modal="true" aria-labelledby="settings-title">
         <div class="modal">
             <div class="modal-header">
                 <h2 class="modal-title" id="settings-title">Settings</h2>
@@ -184,12 +184,12 @@
                 <button class="btn" id="save-settings-btn" style="width: 100%;">Save Settings</button>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <!-- ========================================
          Channels Modal
          ======================================== -->
-    <div class="modal-overlay" id="channels-modal" role="dialog" aria-modal="true" aria-labelledby="channels-title">
+    <dialog class="modal-overlay" id="channels-modal" aria-modal="true" aria-labelledby="channels-title">
         <div class="modal">
             <div class="modal-header">
                 <h2 class="modal-title" id="channels-title">Channels</h2>
@@ -207,8 +207,8 @@
                     >
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Tracked Channels</label>
-                    <div class="channel-list" id="channel-list">
+                    <label class="form-label" id="tracked-channels-label">Tracked Channels</label>
+                    <div class="channel-list" id="channel-list" aria-labelledby="tracked-channels-label">
                         <div class="channel-list-empty" id="channel-list-empty">
                             No channels added yet.
                         </div>
@@ -216,13 +216,13 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </dialog>
     </div>
 
     <!-- ========================================
          Database Modal
          ======================================== -->
-    <div class="modal-overlay" id="database-modal" role="dialog" aria-modal="true" aria-labelledby="database-title">
+    <dialog class="modal-overlay" id="database-modal" aria-modal="true" aria-labelledby="database-title">
         <div class="modal">
             <div class="modal-header">
                 <h2 class="modal-title" id="database-title">Database</h2>
@@ -245,13 +245,13 @@
                     <div class="status-message" id="database-delete-status"></div>
                 </div>
             </div>
-        </div>
+        </dialog>
     </div>
 
     <!-- ========================================
          Confirmation Modal
          ======================================== -->
-    <div class="modal-overlay" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <dialog class="modal-overlay" id="confirm-modal" aria-modal="true" aria-labelledby="confirm-title">
         <div class="modal" style="max-width: 400px;">
             <div class="modal-header">
                 <h2 class="modal-title" id="confirm-title">Confirm Action</h2>
@@ -264,7 +264,7 @@
                     <button class="btn btn-danger" id="confirm-ok-btn" type="button">Confirm</button>
                 </div>
             </div>
-        </div>
+        </dialog>
     </div>
 
     <!-- ========================================

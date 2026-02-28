@@ -135,7 +135,12 @@
         lastFocusedElement = document.activeElement;
         currentModal = settingsModal;
 
-        settingsModal.classList.add('active');
+        // Use native dialog method if available, fallback to class
+        if (settingsModal.showModal) {
+            settingsModal.showModal();
+        } else {
+            settingsModal.classList.add('active');
+        }
         document.body.style.overflow = 'hidden';
         setMainContentInert(true);
 
@@ -157,7 +162,12 @@
         lastFocusedElement = document.activeElement;
         currentModal = channelsModal;
 
-        channelsModal.classList.add('active');
+        // Use native dialog method if available, fallback to class
+        if (channelsModal.showModal) {
+            channelsModal.showModal();
+        } else {
+            channelsModal.classList.add('active');
+        }
         document.body.style.overflow = 'hidden';
         setMainContentInert(true);
 
@@ -176,7 +186,12 @@
      * Closes the settings modal
      */
     function closeModal() {
-        settingsModal.classList.remove('active');
+        // Use native dialog method if available, fallback to class
+        if (settingsModal.close) {
+            settingsModal.close();
+        } else {
+            settingsModal.classList.remove('active');
+        }
         document.body.style.overflow = '';
         setMainContentInert(false);
         clearAllStatusMessages();
@@ -193,7 +208,12 @@
      * Closes the channels modal
      */
     function closeChannelsModal() {
-        channelsModal.classList.remove('active');
+        // Use native dialog method if available, fallback to class
+        if (channelsModal.close) {
+            channelsModal.close();
+        } else {
+            channelsModal.classList.remove('active');
+        }
         document.body.style.overflow = '';
         setMainContentInert(false);
         currentModal = null;
@@ -212,7 +232,12 @@
         lastFocusedElement = document.activeElement;
         currentModal = databaseModal;
 
-        databaseModal.classList.add('active');
+        // Use native dialog method if available, fallback to class
+        if (databaseModal.showModal) {
+            databaseModal.showModal();
+        } else {
+            databaseModal.classList.add('active');
+        }
         document.body.style.overflow = 'hidden';
         setMainContentInert(true);
     }
@@ -221,10 +246,15 @@
      * Closes the database tools modal
      */
     function closeDatabaseModal() {
-        databaseModal.classList.remove('active');
+        // Use native dialog method if available, fallback to class
+        if (databaseModal.close) {
+            databaseModal.close();
+        } else {
+            databaseModal.classList.remove('active');
+        }
         document.body.style.overflow = '';
         setMainContentInert(false);
-        hideStatus(databaseImportStatus);
+        hideStatus(databaseImportInput);
         hideStatus(databaseExportStatus);
         hideStatus(databaseDeleteStatus);
         if (databaseImportInput) {
@@ -263,7 +293,12 @@
                 confirmOkBtn.classList.add('btn');
             }
 
-            confirmModal.classList.add('active');
+            // Use native dialog method if available, fallback to class
+            if (confirmModal.showModal) {
+                confirmModal.showModal();
+            } else {
+                confirmModal.classList.add('active');
+            }
             document.body.style.overflow = 'hidden';
 
             // Focus the cancel button for safety
@@ -276,7 +311,12 @@
      * @param {boolean} result - Result to return to the promise
      */
     function closeConfirmModal(result = false) {
-        confirmModal.classList.remove('active');
+        // Use native dialog method if available, fallback to class
+        if (confirmModal.close) {
+            confirmModal.close();
+        } else {
+            confirmModal.classList.remove('active');
+        }
         document.body.style.overflow = '';
 
         if (confirmResolve) {
@@ -375,7 +415,7 @@
     async function importSettings(settings) {
         if (Array.isArray(settings)) {
             for (const item of settings) {
-                if (item && item.key !== undefined) {
+                if (item?.key !== undefined) {
                     await globalThis.LatestTube.DB.settings.set(item.key, item.value);
                 }
             }
@@ -413,7 +453,7 @@
     async function importTags(channelTags) {
         if (Array.isArray(channelTags)) {
             for (const tagEntry of channelTags) {
-                if (tagEntry && tagEntry.channelId && tagEntry.tag) {
+                if (tagEntry?.channelId && tagEntry?.tag) {
                     await globalThis.LatestTube.DB.tags.add(tagEntry.channelId, tagEntry.tag);
                 }
             }
@@ -437,7 +477,7 @@
             const text = await file.text();
             const payload = JSON.parse(text);
 
-            if (!payload || !payload.data) {
+            if (!payload?.data) {
                 showStatus(databaseImportStatus, 'Invalid backup file format.', 'error');
                 return;
             }
@@ -971,11 +1011,7 @@
     confirmClose.addEventListener('click', () => closeConfirmModal(false));
     confirmCancelBtn.addEventListener('click', () => closeConfirmModal(false));
     confirmOkBtn.addEventListener('click', () => closeConfirmModal(true));
-    confirmModal.addEventListener('click', function(event) {
-        if (event.target === confirmModal) {
-            closeConfirmModal(false);
-        }
-    });
+    // Note: Backdrop click removed - confirmation modal only closes via buttons
 
     if (saveApiKeyBtn) {
         saveApiKeyBtn.addEventListener('click', saveApiKey);
@@ -1017,7 +1053,7 @@
 
     // Escape key to close tooltip
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && shortsTooltip && shortsTooltip.classList.contains('active')) {
+        if (e.key === 'Escape' && shortsTooltip?.classList.contains('active')) {
             hideShortsTooltip();
         }
     });
@@ -1029,7 +1065,7 @@
     }
     if (databaseImportInput) {
         databaseImportInput.addEventListener('change', (event) => {
-            const file = event.target.files && event.target.files[0];
+            const file = event.target.files?.[0];
             if (file) {
                 importDatabase(file);
             }
@@ -1056,18 +1092,8 @@
         });
     }
 
-    // Close modal on backdrop click
-    settingsModal.addEventListener('click', function(event) {
-        if (event.target === settingsModal) {
-            closeModal();
-        }
-    });
-
-    channelsModal.addEventListener('click', function(event) {
-        if (event.target === channelsModal) {
-            closeChannelsModal();
-        }
-    });
+    // Note: Backdrop click to close has been removed as per user preference
+    // Modals now only close via the close button or Escape key
 
     if (channelsSearchInput) {
         channelsSearchInput.addEventListener('input', debounce(async () => {
@@ -1075,23 +1101,23 @@
         }, 200));
     }
 
-    databaseModal.addEventListener('click', function(event) {
-        if (event.target === databaseModal) {
-            closeDatabaseModal();
-        }
-    });
-
     // Close modal on Escape key and trap focus within modal
     document.addEventListener('keydown', function(event) {
-        // Handle Escape key for closing modals
-        if (event.key === 'Escape' && settingsModal.classList.contains('active')) {
-            closeModal();
-        }
-        if (event.key === 'Escape' && channelsModal.classList.contains('active')) {
-            closeChannelsModal();
-        }
-        if (event.key === 'Escape' && databaseModal.classList.contains('active')) {
-            closeDatabaseModal();
+        // Handle Escape key for closing modals (only for non-dialog fallback)
+        if (event.key === 'Escape') {
+            const isSettingsOpen = settingsModal.open || settingsModal.classList.contains('active');
+            const isChannelsOpen = channelsModal.open || channelsModal.classList.contains('active');
+            const isDatabaseOpen = databaseModal.open || databaseModal.classList.contains('active');
+
+            if (isSettingsOpen && !settingsModal.open) {
+                closeModal();
+            }
+            if (isChannelsOpen && !channelsModal.open) {
+                closeChannelsModal();
+            }
+            if (isDatabaseOpen && !databaseModal.open) {
+                closeDatabaseModal();
+            }
         }
 
         // Handle Tab key for focus trap
