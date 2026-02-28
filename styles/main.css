@@ -438,9 +438,9 @@
         }
 
         .duration-icon {
-            width: 14px;
-            height: 14px;
-            opacity: 0.8;
+            font-size: 14px;
+            line-height: 1;
+            flex-shrink: 0;
         }
 
         .video-actions {
@@ -895,6 +895,11 @@
             width: 18px;
             height: 18px;
             color: var(--text-secondary);
+            background: transparent;
+            border: none;
+            padding: 0;
+            font-size: 16px;
+            line-height: 1;
             cursor: pointer;
             transition: color 0.2s ease;
             margin-left: 0.25rem;

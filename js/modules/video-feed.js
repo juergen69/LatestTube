@@ -47,7 +47,7 @@
         const relativeTime = Utils.formatRelativeTime ? Utils.formatRelativeTime(video.publishedAt) : formatRelativeTimeFallback(video.publishedAt);
         const durationLabel = Utils.formatDuration ? Utils.formatDuration(video.durationSeconds) : formatDurationFallback(video.durationSeconds);
         const durationMeta = durationLabel
-            ? `<span class="video-separator">•</span><span class="video-duration"><svg class="duration-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${durationLabel}</span>`
+            ? `<span class="video-separator">•</span><span class="video-duration"><span class="duration-icon">⏱</span>${durationLabel}</span>`
             : '';
 
         // Use shared escapeHtml or fallback
