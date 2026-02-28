@@ -49,7 +49,6 @@
     const includeShortsInfo = document.getElementById('include-shorts-info');
     const shortsTooltip = document.getElementById('shorts-tooltip');
     const shortsTooltipClose = document.getElementById('shorts-tooltip-close');
-    const shortsDurationInfo = document.getElementById('shorts-duration-info');
 
     // Channel elements
     const channelList = document.getElementById('channel-list');
@@ -370,6 +369,70 @@
     }
 
     /**
+     * Import settings into database
+     * @param {Array} settings
+     */
+    async function importSettings(settings) {
+        if (Array.isArray(settings)) {
+            for (const item of settings) {
+                if (item && item.key !== undefined) {
+                    await globalThis.LatestTube.DB.settings.set(item.key, item.value);
+                }
+            }
+        }
+    }
+
+    /**
+     * Import channels into database
+     * @param {Array} channels
+     */
+    async function importChannels(channels) {
+        if (Array.isArray(channels)) {
+            for (const channel of channels) {
+                await globalThis.LatestTube.DB.channels.add(channel);
+            }
+        }
+    }
+
+    /**
+     * Import videos into database
+     * @param {Array} videos
+     */
+    async function importVideos(videos) {
+        if (Array.isArray(videos)) {
+            for (const video of videos) {
+                await globalThis.LatestTube.DB.videos.add(video);
+            }
+        }
+    }
+
+    /**
+     * Import tags into database
+     * @param {Array} channelTags
+     */
+    async function importTags(channelTags) {
+        if (Array.isArray(channelTags)) {
+            for (const tagEntry of channelTags) {
+                if (tagEntry && tagEntry.channelId && tagEntry.tag) {
+                    await globalThis.LatestTube.DB.tags.add(tagEntry.channelId, tagEntry.tag);
+                }
+            }
+        }
+    }
+
+    /**
+     * Refresh UI components after database import
+     */
+    async function refreshAfterImport() {
+        if (globalThis.LatestTube.VideoFeed?.refresh) {
+            await globalThis.LatestTube.VideoFeed.refresh();
+        }
+        if (globalThis.LatestTube.Filters?.renderFilterChips) {
+            await globalThis.LatestTube.Filters.renderFilterChips();
+        }
+    }
+
+    /**
      * Import database from JSON file
      */
     async function importDatabase(file) {
@@ -394,42 +457,11 @@
             if (!confirmed) return;
 
             await globalThis.LatestTube.DB.resetDatabase();
-
-            if (Array.isArray(settings)) {
-                for (const item of settings) {
-                    if (item && item.key !== undefined) {
-                        await globalThis.LatestTube.DB.settings.set(item.key, item.value);
-                    }
-                }
-            }
-
-            if (Array.isArray(channels)) {
-                for (const channel of channels) {
-                    await globalThis.LatestTube.DB.channels.add(channel);
-                }
-            }
-
-            if (Array.isArray(videos)) {
-                for (const video of videos) {
-                    await globalThis.LatestTube.DB.videos.add(video);
-                }
-            }
-
-            if (Array.isArray(channelTags)) {
-                for (const tagEntry of channelTags) {
-                    if (tagEntry && tagEntry.channelId && tagEntry.tag) {
-                        await globalThis.LatestTube.DB.tags.add(tagEntry.channelId, tagEntry.tag);
-                    }
-                }
-            }
-
-            if (globalThis.LatestTube.VideoFeed?.refresh) {
-                await globalThis.LatestTube.VideoFeed.refresh();
-            }
-
-            if (globalThis.LatestTube.Filters?.renderFilterChips) {
-                await globalThis.LatestTube.Filters.renderFilterChips();
-            }
+            await importSettings(settings);
+            await importChannels(channels);
+            await importVideos(videos);
+            await importTags(channelTags);
+            await refreshAfterImport();
 
             showStatus(databaseImportStatus, 'Database imported successfully.', 'success');
         } catch (error) {
@@ -537,8 +569,8 @@
                 return; // Don't close modal if API key is missing
             }
 
-            const duration = parseInt(shortsDurationInput.value, 10);
-            if (isNaN(duration) || duration < 1 || duration > 3600) {
+            const duration = Number.parseInt(shortsDurationInput.value, 10);
+            if (Number.isNaN(duration) || duration < 1 || duration > 3600) {
                 showStatus(shortsDurationStatus, 'Please enter a valid duration (1-3600 seconds)', 'error');
                 return; // Don't close if duration is invalid
             }

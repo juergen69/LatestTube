@@ -203,19 +203,11 @@
     }
 
     /**
-     * Fetch channel information from YouTube API.
-     * Supports batching: pass a single ID/handle or an array of IDs.
-     * Batching multiple channel IDs into one request saves quota
-     * (1 unit total vs 1 unit per channel).
-     * @param {string|string[]} channelIds - YouTube channel ID(s) or handle
-     * @returns {Promise<Object|Object[]>} - Channel details (single or array)
+     * Separate channel IDs from handles
+     * @param {string[]} ids
+     * @returns {{regularIds: string[], handles: string[]}}
      */
-    async function fetchChannelInfo(channelIds) {
-        const apiKey = await getApiKey();
-        const isBatch = Array.isArray(channelIds);
-        const ids = isBatch ? channelIds : [channelIds];
-
-        // Separate IDs from handles (handles must use forHandle, max 1 at a time)
+    function separateIdsAndHandles(ids) {
         const regularIds = [];
         const handles = [];
 
@@ -227,35 +219,52 @@
             }
         }
 
+        return { regularIds, handles };
+    }
+
+    /**
+     * Batch fetch regular channel IDs
+     * @param {string[]} regularIds
+     * @param {string} apiKey
+     * @returns {Promise<Array>}
+     */
+    async function batchFetchChannelIds(regularIds, apiKey) {
         const results = [];
+        const batchSize = 50;
 
-        // Batch fetch regular channel IDs (up to 50 per request - saves quota!)
-        // e.g., 5 channels in 1 request = 1 unit instead of 5 units
-        if (regularIds.length > 0) {
-            const batchSize = 50;
-            for (let i = 0; i < regularIds.length; i += batchSize) {
-                const batch = regularIds.slice(i, i + batchSize);
-                const idsParam = batch.join(',');
-                const url = `${BASE_URL}/channels?part=snippet,contentDetails&id=${idsParam}&fields=items(id,snippet(title,description,thumbnails/default/url),contentDetails/relatedPlaylists/uploads)&key=${apiKey}`;
+        for (let i = 0; i < regularIds.length; i += batchSize) {
+            const batch = regularIds.slice(i, i + batchSize);
+            const idsParam = batch.join(',');
+            const url = `${BASE_URL}/channels?part=snippet,contentDetails&id=${idsParam}&fields=items(id,snippet(title,description,thumbnails/default/url),contentDetails/relatedPlaylists/uploads)&key=${apiKey}`;
 
-                console.log(`YouTube API: Batch fetching channel info for ${batch.length} channel(s)`);
-                const data = await apiRequest(url, `fetchChannelInfo(batch:${batch.length})`, 'channels.list', 1);
+            console.log(`YouTube API: Batch fetching channel info for ${batch.length} channel(s)`);
+            const data = await apiRequest(url, `fetchChannelInfo(batch:${batch.length})`, 'channels.list', 1);
 
-                if (data.items) {
-                    for (const item of data.items) {
-                        results.push({
-                            channelId: item.id,
-                            title: item.snippet.title,
-                            thumbnail: item.snippet.thumbnails?.default?.url,
-                            uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads,
-                            description: item.snippet.description
-                        });
-                    }
+            if (data.items) {
+                for (const item of data.items) {
+                    results.push({
+                        channelId: item.id,
+                        title: item.snippet.title,
+                        thumbnail: item.snippet.thumbnails?.default?.url,
+                        uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads,
+                        description: item.snippet.description
+                    });
                 }
             }
         }
 
-        // Fetch handles individually (API doesn't support batching forHandle)
+        return results;
+    }
+
+    /**
+     * Fetch channel info for handles individually
+     * @param {string[]} handles
+     * @param {string} apiKey
+     * @returns {Promise<Array>}
+     */
+    async function fetchHandles(handles, apiKey) {
+        const results = [];
+
         for (const handle of handles) {
             const url = `${BASE_URL}/channels?part=snippet,contentDetails&forHandle=${handle.substring(1)}&fields=items(id,snippet(title,description,thumbnails/default/url),contentDetails/relatedPlaylists/uploads)&key=${apiKey}`;
 
@@ -272,6 +281,37 @@
                     description: item.snippet.description
                 });
             }
+        }
+
+        return results;
+    }
+
+    /**
+     * Fetch channel information from YouTube API.
+     * Supports batching: pass a single ID/handle or an array of IDs.
+     * Batching multiple channel IDs into one request saves quota
+     * (1 unit total vs 1 unit per channel).
+     * @param {string|string[]} channelIds - YouTube channel ID(s) or handle
+     * @returns {Promise<Object|Object[]>} - Channel details (single or array)
+     */
+    async function fetchChannelInfo(channelIds) {
+        const apiKey = await getApiKey();
+        const isBatch = Array.isArray(channelIds);
+        const ids = isBatch ? channelIds : [channelIds];
+
+        const { regularIds, handles } = separateIdsAndHandles(ids);
+        const results = [];
+
+        // Batch fetch regular channel IDs (up to 50 per request - saves quota!)
+        if (regularIds.length > 0) {
+            const batchResults = await batchFetchChannelIds(regularIds, apiKey);
+            results.push(...batchResults);
+        }
+
+        // Fetch handles individually (API doesn't support batching forHandle)
+        if (handles.length > 0) {
+            const handleResults = await fetchHandles(handles, apiKey);
+            results.push(...handleResults);
         }
 
         if (!isBatch) {
@@ -340,13 +380,81 @@
     async function getShortsDurationThreshold() {
         try {
             const duration = await globalThis.LatestTube.DB.settings.get('shortsDuration');
-            if (duration !== undefined && duration !== null && !isNaN(duration)) {
+            if (duration !== undefined && duration !== null && !Number.isNaN(duration)) {
                 return duration;
             }
         } catch (error) {
             console.warn('YouTube API: Could not load shorts duration, using default', error);
         }
         return 60; // Default threshold: 60 seconds
+    }
+
+    /**
+     * Check if video should be included based on options
+     * @param {Object} video
+     * @param {Date} sixMonthsAgo
+     * @param {number} shortsDurationThreshold
+     * @param {boolean} includeShorts
+     * @returns {{include: boolean, isShort: boolean, stop: boolean}}
+     */
+    function shouldIncludeVideo(video, sixMonthsAgo, shortsDurationThreshold, includeShorts) {
+        const videoDate = new Date(video.publishedAt);
+
+        // Stop if video is older than sinceDate
+        if (videoDate < sixMonthsAgo) {
+            console.log(`YouTube API: Stopping pagination - video ${video.videoId} is too old (${video.publishedAt})`);
+            return { include: false, isShort: false, stop: true };
+        }
+
+        const isShort = typeof video.durationSeconds === 'number'
+            ? video.durationSeconds <= shortsDurationThreshold
+            : false;
+
+        if (!includeShorts && isShort) {
+            console.log(`YouTube API: Skipping short video ${video.videoId} (${video.durationSeconds}s <= ${shortsDurationThreshold}s threshold)`);
+            return { include: false, isShort, stop: false };
+        }
+
+        return { include: true, isShort, stop: false };
+    }
+
+    /**
+     * Process video results from a playlist fetch
+     * @param {Array} videos
+     * @param {Date} sixMonthsAgo
+     * @param {number} shortsDurationThreshold
+     * @param {boolean} includeShorts
+     * @param {string} resolvedChannelId
+     * @param {number} maxVideos
+     * @returns {{allVideos: Array, stopPagination: boolean}}
+     */
+    function processVideoResults(videos, sixMonthsAgo, shortsDurationThreshold, includeShorts, resolvedChannelId, maxVideos) {
+        const allVideos = [];
+        let stopPagination = false;
+
+        for (const video of videos) {
+            const { include, stop } = shouldIncludeVideo(video, sixMonthsAgo, shortsDurationThreshold, includeShorts);
+
+            if (stop) {
+                stopPagination = true;
+                break;
+            }
+
+            if (include) {
+                allVideos.push({
+                    ...video,
+                    channelId: resolvedChannelId
+                });
+
+                if (allVideos.length >= maxVideos) {
+                    console.log(`YouTube API: Reached per-channel limit (${maxVideos})`);
+                    stopPagination = true;
+                    break;
+                }
+            }
+        }
+
+        return { allVideos, stopPagination };
     }
 
     /**
@@ -388,37 +496,17 @@
         do {
             const result = await fetchPlaylistVideos(channelInfo.uploadsPlaylistId, pageToken);
 
-            for (const video of result.videos) {
-                const videoDate = new Date(video.publishedAt);
+            const { allVideos: processedVideos, stopPagination: shouldStop } = processVideoResults(
+                result.videos,
+                sixMonthsAgo,
+                shortsDurationThreshold,
+                includeShorts,
+                resolvedChannelId,
+                MAX_VIDEOS_PER_CHANNEL
+            );
 
-                // Stop if video is older than sinceDate
-                if (videoDate < sixMonthsAgo) {
-                    console.log(`YouTube API: Stopping pagination - video ${video.videoId} is too old (${video.publishedAt})`);
-                    stopPagination = true;
-                    break;
-                }
-
-                const isShort = typeof video.durationSeconds === 'number'
-                    ? video.durationSeconds <= shortsDurationThreshold
-                    : false;
-
-                if (!includeShorts && isShort) {
-                    console.log(`YouTube API: Skipping short video ${video.videoId} (${video.durationSeconds}s <= ${shortsDurationThreshold}s threshold)`);
-                    continue;
-                }
-
-                allVideos.push({
-                    ...video,
-                    channelId: resolvedChannelId
-                });
-
-                if (allVideos.length >= MAX_VIDEOS_PER_CHANNEL) {
-                    console.log(`YouTube API: Reached per-channel limit (${MAX_VIDEOS_PER_CHANNEL})`);
-                    stopPagination = true;
-                    break;
-                }
-            }
-
+            allVideos.push(...processedVideos);
+            stopPagination = shouldStop;
             pageToken = result.nextPageToken;
 
             if (stopPagination) {
@@ -477,7 +565,8 @@
      */
     function parseIsoDurationToSeconds(isoDuration) {
         if (!isoDuration) return null;
-        const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
+        const match = regex.exec(isoDuration);
         if (!match) return null;
         const hours = Number.parseInt(match[1] || '0', 10);
         const minutes = Number.parseInt(match[2] || '0', 10);

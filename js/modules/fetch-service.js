@@ -33,13 +33,120 @@
     async function getShortsDurationThreshold() {
         try {
             const duration = await globalThis.LatestTube.DB.settings.get('shortsDuration');
-            if (duration !== undefined && duration !== null && !isNaN(duration)) {
+            if (duration !== undefined && duration !== null && !Number.isNaN(duration)) {
                 return duration;
             }
         } catch (error) {
             console.warn('FetchService: Could not load shorts duration, using default', error);
         }
         return 60; // Default threshold: 60 seconds
+    }
+
+    /**
+     * Get cached channel info from database
+     * @param {string} channelId
+     * @returns {Promise<Object|null>}
+     */
+    async function getCachedChannelInfo(channelId) {
+        try {
+            const existing = await globalThis.LatestTube.DB.channels.get(channelId);
+            if (existing?.uploadsPlaylistId) {
+                console.log(`FetchService: Using cached channel info for ${channelId} (saving 1 quota unit)`);
+                return existing;
+            }
+        } catch (error) {
+            console.log(`FetchService: Cache miss for ${channelId}, will fetch from API`);
+        }
+        return null;
+    }
+
+    /**
+     * Save channel to database
+     * @param {string} channelId
+     * @param {Object} channelInfo
+     * @param {Object} options
+     */
+    async function saveChannel(channelId, channelInfo, options) {
+        const channel = {
+            channelId: channelInfo.channelId,
+            title: channelInfo.title,
+            thumbnail: channelInfo.thumbnail,
+            uploadsPlaylistId: channelInfo.uploadsPlaylistId,
+            addedAt: Date.now(),
+            includeShorts: options.includeShorts !== false
+        };
+
+        try {
+            const existing = await globalThis.LatestTube.DB.channels.get(channelId);
+            if (!existing) {
+                await globalThis.LatestTube.DB.channels.add(channel);
+            } else if (options.includeShorts !== undefined) {
+                await globalThis.LatestTube.DB.channels.update({
+                    ...existing,
+                    includeShorts: options.includeShorts !== false
+                });
+            }
+        } catch (error) {
+            console.log(`FetchService: Channel ${channelId} already exists or error:`, error.message);
+        }
+    }
+
+    /**
+     * Save videos to database
+     * @param {Array} videos
+     * @returns {Object} Counts of added and skipped videos
+     */
+    async function saveVideos(videos) {
+        let addedCount = 0;
+        let skippedCount = 0;
+
+        for (const video of videos) {
+            const exists = await videoExists(video.videoId);
+
+            if (exists) {
+                skippedCount++;
+                continue;
+            }
+
+            const videoRecord = {
+                videoId: video.videoId,
+                channelId: video.channelId,
+                title: video.title,
+                thumbnail: video.thumbnail,
+                publishedAt: video.publishedAt,
+                description: video.description,
+                durationSeconds: video.durationSeconds ?? null,
+                watched: false
+            };
+
+            try {
+                await globalThis.LatestTube.DB.videos.add(videoRecord);
+                addedCount++;
+                console.log(`FetchService: Added video ${video.videoId} - ${video.title.substring(0, 50)}...`);
+            } catch (error) {
+                console.error(`FetchService: Failed to add video ${video.videoId}`, error);
+            }
+        }
+
+        return { addedCount, skippedCount };
+    }
+
+    /**
+     * Prune old videos that are no longer in the channel
+     * @param {string} channelId
+     * @param {Set} fetchedVideoIds
+     */
+    async function pruneOldVideos(channelId, fetchedVideoIds) {
+        try {
+            const existingVideos = await globalThis.LatestTube.DB.videos.getByChannel(channelId);
+            for (const existing of existingVideos) {
+                if (!fetchedVideoIds.has(existing.videoId)) {
+                    await globalThis.LatestTube.DB.videos.delete(existing.videoId);
+                }
+            }
+        } catch (error) {
+            console.error('FetchService: Error pruning old videos', error);
+        }
     }
 
     /**
@@ -56,17 +163,7 @@
             // OPTIMIZATION: Check if channel already exists in DB with uploadsPlaylistId.
             // If so, skip the channels.list API call (saves 1 quota unit per channel).
             // Per blog: "Batching reduces costs" — avoiding unnecessary calls is even better.
-            let cachedChannelInfo = null;
-            try {
-                const existing = await globalThis.LatestTube.DB.channels.get(channelId);
-                if (existing?.uploadsPlaylistId) {
-                    cachedChannelInfo = existing;
-                    console.log(`FetchService: Using cached channel info for ${channelId} (saving 1 quota unit)`);
-                }
-            } catch (error) {
-                // If we can't read cache, we'll just fetch from API
-                console.log(`FetchService: Cache miss for ${channelId}, will fetch from API`);
-            }
+            const cachedChannelInfo = await getCachedChannelInfo(channelId);
 
             // Get shorts duration threshold from settings
             const shortsDurationThreshold = await getShortsDurationThreshold();
@@ -82,77 +179,15 @@
                 }
             );
 
-            // Update channel in database
-            const channel = {
-                channelId: channelInfo.channelId,
-                title: channelInfo.title,
-                thumbnail: channelInfo.thumbnail,
-                uploadsPlaylistId: channelInfo.uploadsPlaylistId,
-                addedAt: Date.now(),
-                includeShorts: options.includeShorts !== false
-            };
-
-            // Check if channel exists, if so update it, otherwise add it
-            try {
-                const existing = await globalThis.LatestTube.DB.channels.get(channelId);
-                if (!existing) {
-                    await globalThis.LatestTube.DB.channels.add(channel);
-                } else if (options.includeShorts !== undefined) {
-                    await globalThis.LatestTube.DB.channels.update({
-                        ...existing,
-                        includeShorts: options.includeShorts !== false
-                    });
-                }
-                // Note: We don't update existing channels here to preserve addedAt
-            } catch (error) {
-                // Channel might already exist
-                console.log(`FetchService: Channel ${channelId} already exists or error:`, error.message);
-            }
+            // Save channel to database
+            await saveChannel(channelId, channelInfo, options);
 
             // Store videos (skip duplicates)
-            let addedCount = 0;
-            let skippedCount = 0;
             const fetchedVideoIds = new Set(videos.map(video => video.videoId));
-
-            for (const video of videos) {
-                const exists = await videoExists(video.videoId);
-
-                if (exists) {
-                    skippedCount++;
-                    continue;
-                }
-
-                const videoRecord = {
-                    videoId: video.videoId,
-                    channelId: video.channelId,
-                    title: video.title,
-                    thumbnail: video.thumbnail,
-                    publishedAt: video.publishedAt,
-                    description: video.description,
-                    durationSeconds: video.durationSeconds ?? null,
-                    watched: false
-                };
-
-                try {
-                    await globalThis.LatestTube.DB.videos.add(videoRecord);
-                    addedCount++;
-                    console.log(`FetchService: Added video ${video.videoId} - ${video.title.substring(0, 50)}...`);
-                } catch (error) {
-                    console.error(`FetchService: Failed to add video ${video.videoId}`, error);
-                }
-            }
+            const { addedCount, skippedCount } = await saveVideos(videos);
 
             // Prune older videos beyond the newest set
-            try {
-                const existingVideos = await globalThis.LatestTube.DB.videos.getByChannel(channelId);
-                for (const existing of existingVideos) {
-                    if (!fetchedVideoIds.has(existing.videoId)) {
-                        await globalThis.LatestTube.DB.videos.delete(existing.videoId);
-                    }
-                }
-            } catch (error) {
-                console.error('FetchService: Error pruning old videos', error);
-            }
+            await pruneOldVideos(channelId, fetchedVideoIds);
 
             console.log(`FetchService: Channel ${channelId} refreshed - ${addedCount} added, ${skippedCount} skipped`);
 
