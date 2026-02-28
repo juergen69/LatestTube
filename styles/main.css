@@ -398,6 +398,7 @@
             line-height: 1.4;
             display: -webkit-box;
             -webkit-line-clamp: 2;
+            line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
             text-decoration: none;
@@ -801,14 +802,14 @@
         }
 
         .status-message.success {
-            background-color: rgba(76, 175, 80, 0.25);
-            color: #ffffff;
+            background-color: #134E1A;
+            color: #98DD9B;
         }
 
         .status-message.error {
-            background-color: rgba(255, 68, 68, 0.25);
-            color: #ffffff;
-        }
+            background-color: #4B0C0C;
+            color: #f85757;
+        }   
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-5px); }
