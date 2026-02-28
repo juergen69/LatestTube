@@ -801,13 +801,13 @@
         }
 
         .status-message.success {
-            background-color: rgba(76, 175, 80, 0.2);
-            color: #81c784;
+            background-color: rgba(76, 175, 80, 0.25);
+            color: #ffffff;
         }
 
         .status-message.error {
-            background-color: rgba(255, 68, 68, 0.2);
-            color: #ff8a80;
+            background-color: rgba(255, 68, 68, 0.25);
+            color: #ffffff;
         }
 
         @keyframes fadeIn {
