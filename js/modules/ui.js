@@ -424,12 +424,8 @@
      * Refresh UI components after database import
      */
     async function refreshAfterImport() {
-        if (globalThis.LatestTube.VideoFeed?.refresh) {
-            await globalThis.LatestTube.VideoFeed.refresh();
-        }
-        if (globalThis.LatestTube.Filters?.renderFilterChips) {
-            await globalThis.LatestTube.Filters.renderFilterChips();
-        }
+        await globalThis.LatestTube.VideoFeed?.refresh?.();
+        await globalThis.LatestTube.Filters?.renderFilterChips?.();
     }
 
     /**
@@ -487,12 +483,12 @@
         if (!confirmed) return;
         try {
             await globalThis.LatestTube.DB.resetDatabase();
-            if (globalThis.LatestTube.VideoFeed?.refresh) {
-                await globalThis.LatestTube.VideoFeed.refresh();
-            }
-            if (globalThis.LatestTube.Filters?.renderFilterChips) {
-                await globalThis.LatestTube.Filters.renderFilterChips();
-            }
+            await importSettings(settings);
+            await importChannels(channels);
+            await importVideos(videos);
+            await importTags(channelTags);
+            await globalThis.LatestTube.VideoFeed?.refresh?.();
+            await globalThis.LatestTube.Filters?.renderFilterChips?.();
             showStatus(databaseDeleteStatus, 'Database deleted successfully.', 'success');
         } catch (error) {
             console.error('Database: Delete failed', error);
@@ -714,9 +710,7 @@
                 };
                 await globalThis.LatestTube.DB.channels.update(updated);
                 channel.includeShorts = updated.includeShorts;
-                if (globalThis.LatestTube.VideoFeed?.refresh) {
-                    await globalThis.LatestTube.VideoFeed.refresh();
-                }
+                await globalThis.LatestTube.VideoFeed?.refresh?.();
             } catch (error) {
                 console.error('Settings: Error updating include shorts', error);
                 event.target.checked = channel.includeShorts !== false;
@@ -1106,65 +1100,103 @@
         }
     });
 
-    // Refresh button - triggers video fetch for all channels
-    refreshBtn.addEventListener('click', async function() {
+    /**
+     * Validates prerequisites for refresh (API key and channels exist)
+     * @returns {Promise<{valid: boolean, reason: string}>}
+     */
+    async function validateRefreshPrerequisites() {
+        const apiKey = await globalThis.LatestTube.DB.settings.get('apiKey');
+        if (!apiKey) {
+            return { valid: false, reason: 'apiKey' };
+        }
+
+        const channels = await globalThis.LatestTube.DB.channels.getAll();
+        if (channels.length === 0) {
+            return { valid: false, reason: 'noChannels' };
+        }
+
+        return { valid: true, reason: '', channels };
+    }
+
+    /**
+     * Sets refresh button to loading state
+     */
+    function setRefreshLoadingState() {
+        refreshBtn.classList.add('refreshing');
+        refreshBtn.style.animation = 'spin 1s linear infinite';
+        refreshBtn.title = 'Refreshing...';
+    }
+
+    /**
+     * Clears refresh button loading state
+     */
+    function clearRefreshLoadingState() {
+        refreshBtn.classList.remove('refreshing');
+        refreshBtn.style.animation = '';
+        refreshBtn.title = 'Refresh videos';
+    }
+
+    /**
+     * Shows toast notification
+     * @param {string} message
+     * @param {string} type
+     */
+    function showRefreshToast(message, type) {
+        if (globalThis.LatestTube.App?.showToast) {
+            globalThis.LatestTube.App.showToast(message, type, 5000);
+        }
+    }
+
+    /**
+     * Logs refresh results to console
+     * @param {Object} result
+     */
+    function logRefreshResults(result) {
+        console.log(`Refresh complete: ${result.totalAdded} videos added, ${result.totalSkipped} skipped`);
+
+        if (result.totalAdded > 0) {
+            console.log(`✓ Added ${result.totalAdded} new videos`);
+        }
+        if (result.totalSkipped > 0) {
+            console.log(`✓ Skipped ${result.totalSkipped} existing videos`);
+        }
+
+        const errors = result.results.filter(r => !r.success);
+        if (errors.length > 0) {
+            console.warn(`⚠ ${errors.length} channel(s) had errors:`, errors.map(e => e.error));
+        }
+    }
+
+    /**
+     * Handles the refresh button click
+     */
+    async function handleRefreshClick() {
         if (globalThis.LatestTube.FetchService.isRefreshInProgress()) {
             console.log('Refresh already in progress');
             return;
         }
 
-        // Check if API key is configured
-        const apiKey = await globalThis.LatestTube.DB.settings.get('apiKey');
-        if (!apiKey) {
-            console.error('Refresh: No API key configured');
-            if (globalThis.LatestTube.App?.showToast) {
-                globalThis.LatestTube.App.showToast('Please configure your YouTube API key in settings first.', 'error', 5000);
+        const validation = await validateRefreshPrerequisites();
+        if (!validation.valid) {
+            console.error('Refresh: Prerequisites not met');
+            if (validation.reason === 'apiKey') {
+                showRefreshToast('Please configure your YouTube API key in settings first.', 'error');
+                openModal();
+            } else if (validation.reason === 'noChannels') {
+                showRefreshToast('No channels added yet. Add channels to start tracking.', 'error');
+                openChannelsModal();
             }
-            // Open settings modal to guide user
-            openModal();
             return;
         }
 
-        // Check if there are channels to refresh
-        const channels = await globalThis.LatestTube.DB.channels.getAll();
-        if (channels.length === 0) {
-            console.log('Refresh: No channels to refresh');
-            if (globalThis.LatestTube.App?.showToast) {
-                globalThis.LatestTube.App.showToast('No channels added yet. Add channels to start tracking.', 'error', 5000);
-            }
-            // Open channels modal to guide user
-            openChannelsModal();
-            return;
-        }
-
-        // Add spinning animation for loading state
-        refreshBtn.classList.add('refreshing');
-        refreshBtn.style.animation = 'spin 1s linear infinite';
-        refreshBtn.title = 'Refreshing...';
-
-        console.log(`Refresh: Starting refresh for ${channels.length} channels...`);
+        console.log(`Refresh: Starting refresh for ${validation.channels.length} channels...`);
+        setRefreshLoadingState();
 
         try {
             const result = await globalThis.LatestTube.FetchService.refreshAllChannels();
 
             if (result.success) {
-                console.log(`Refresh complete: ${result.totalAdded} videos added, ${result.totalSkipped} skipped`);
-
-                // Show success summary
-                if (result.totalAdded > 0) {
-                    console.log(`✓ Added ${result.totalAdded} new videos`);
-                }
-                if (result.totalSkipped > 0) {
-                    console.log(`✓ Skipped ${result.totalSkipped} existing videos`);
-                }
-
-                // Log any errors
-                const errors = result.results.filter(r => !r.success);
-                if (errors.length > 0) {
-                    console.warn(`⚠ ${errors.length} channel(s) had errors:`, errors.map(e => e.error));
-                }
-
-                // Refresh the video feed to show new videos
+                logRefreshResults(result);
                 await globalThis.LatestTube.VideoFeed.refresh();
             } else {
                 console.error('Refresh failed:', result.error || result.message);
@@ -1172,12 +1204,12 @@
         } catch (error) {
             console.error('Refresh: Error during refresh', error);
         } finally {
-            // Remove loading state
-            refreshBtn.classList.remove('refreshing');
-            refreshBtn.style.animation = '';
-            refreshBtn.title = 'Refresh videos';
+            clearRefreshLoadingState();
         }
-    });
+    }
+
+    // Refresh button - triggers video fetch for all channels
+    refreshBtn.addEventListener('click', handleRefreshClick);
 
     // Expose functions globally
     globalThis.LatestTube.Settings = {

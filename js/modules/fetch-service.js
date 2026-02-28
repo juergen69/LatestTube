@@ -94,7 +94,7 @@
     /**
      * Save videos to database
      * @param {Array} videos
-     * @returns {Object} Counts of added and skipped videos
+     * @returns {Promise<{addedCount: number, skippedCount: number}>} Counts of added and skipped videos
      */
     async function saveVideos(videos) {
         let addedCount = 0;
