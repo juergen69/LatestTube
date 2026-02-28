@@ -24,7 +24,7 @@
      * @returns {string} Current theme ('dark' or 'light')
      */
     function getCurrentTheme() {
-        return document.documentElement.getAttribute('data-theme') || THEMES.DARK;
+        return document.documentElement.dataset.theme || THEMES.DARK;
     }
 
     /**
@@ -33,9 +33,9 @@
      */
     function setTheme(theme) {
         if (theme === THEMES.LIGHT) {
-            document.documentElement.setAttribute('data-theme', THEMES.LIGHT);
+            document.documentElement.dataset.theme = THEMES.LIGHT;
         } else {
-            document.documentElement.removeAttribute('data-theme');
+            delete document.documentElement.dataset.theme;
         }
         updateThemeIcons(theme);
     }
