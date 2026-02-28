@@ -1,5 +1,5 @@
         /* ========================================
-           CSS Custom Properties - Dark Theme
+           CSS Custom Properties - Dark Theme (Default)
            ======================================== */
         :root {
             --bg-primary: #181818;
@@ -17,6 +17,27 @@
             --card-border: rgba(255, 255, 255, 0.08);
             --glass-bg: rgba(24, 24, 24, 0.72);
             --glass-border: rgba(255, 255, 255, 0.12);
+        }
+
+        /* ========================================
+           CSS Custom Properties - Light Theme
+           ======================================== */
+        [data-theme="light"] {
+            --bg-primary: #f9f9f9;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f0f0f0;
+            --text-primary: #0f0f0f;
+            --text-secondary: #606060;
+            --accent: #ff0000;
+            --accent-hover: #cc0000;
+            --border-color: #e5e5e5;
+            --shadow-color: rgba(0, 0, 0, 0.15);
+            --modal-backdrop: rgba(0, 0, 0, 0.6);
+            --chip-bg: #f0f0f0;
+            --chip-active-bg: #ff0000;
+            --card-border: rgba(0, 0, 0, 0.08);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(0, 0, 0, 0.1);
         }
 
         /* ========================================

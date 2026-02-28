@@ -35,6 +35,22 @@
         </div>
         <div class="header-actions">
             <span id="refresh-status" class="refresh-status" style="display: none;"></span>
+            <button class="icon-button" id="theme-btn" title="Toggle theme" aria-label="Toggle light/dark theme">
+                <svg viewBox="0 0 24 24" aria-hidden="true" id="theme-icon-sun">
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M12 2v2" />
+                    <path d="M12 20v2" />
+                    <path d="M4.93 4.93l1.41 1.41" />
+                    <path d="M17.66 17.66l1.41 1.41" />
+                    <path d="M2 12h2" />
+                    <path d="M20 12h2" />
+                    <path d="M6.34 17.66l-1.41 1.41" />
+                    <path d="M19.07 4.93l-1.41 1.41" />
+                </svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true" id="theme-icon-moon" style="display: none;">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+            </button>
             <button class="icon-button" id="refresh-btn" title="Refresh videos" aria-label="Refresh videos">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M21 12a9 9 0 1 1-2.64-6.36" />
@@ -301,6 +317,9 @@
     
     <!-- 5. Tags Module (depends on DB) -->
     <script src="js/modules/tags.js"></script>
+
+    <!-- 5.5 Theme Module (depends on DB) -->
+    <script src="js/modules/theme.js"></script>
     
     <!-- 6. Video Feed Module (depends on DB, Tags, Utils) -->
     <script src="js/modules/video-feed.js"></script>
