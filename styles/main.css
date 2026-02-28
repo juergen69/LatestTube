@@ -431,6 +431,18 @@
             color: var(--text-secondary);
         }
 
+        .video-duration {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .duration-icon {
+            width: 14px;
+            height: 14px;
+            opacity: 0.8;
+        }
+
         .video-actions {
             display: flex;
             flex-direction: column;
