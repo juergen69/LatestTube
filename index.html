@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LatestTube - YouTube Channel Video Tracker</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <!-- ========================================
+         Header Component
+         ======================================== -->
+    <header class="app-header">
+        <div class="header-left">
+            <h1 class="app-title">LatestTube</h1>
+        </div>
+        <div class="header-center">
+            <div class="header-add-channel-row">
+                <input
+                    type="text"
+                    id="add-channel-input"
+                    class="form-input"
+                    placeholder="Add channel URL or ID"
+                    autocomplete="off"
+                    aria-label="Add channel URL or ID"
+                >
+                <label class="checkbox-wrapper compact" for="add-channel-include-shorts">
+                    <input type="checkbox" id="add-channel-include-shorts" checked>
+                    <span>Include "shorts"</span>
+                    <span class="info-icon" id="include-shorts-info" tabindex="0" role="button" aria-label="What are shorts? Click for info" title="&quot;Shorts&quot; are defined by video duration. Configure the threshold in Settings.">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 16v-4"/>
+                            <path d="M12 8h.01"/>
+                        </svg>
+                    </span>
+                </label>
+                <button class="btn" id="add-channel-btn">Add</button>
+            </div>
+            <div class="status-message" id="add-channel-status"></div>
+        </div>
+        <div class="header-actions">
+            <span id="refresh-status" class="refresh-status" style="display: none;"></span>
+            <button class="icon-button" id="refresh-btn" title="Refresh videos" aria-label="Refresh videos">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                    <path d="M21 3v6h-6" />
+                </svg>
+            </button>
+            <button class="icon-button" id="channels-btn" title="Channels" aria-label="Open channels">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="6" width="18" height="12" rx="2" />
+                    <path d="M10 9l5 3-5 3z" />
+                </svg>
+            </button>
+            <button class="icon-button" id="settings-btn" title="Settings" aria-label="Open settings">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a7.8 7.8 0 0 0 .1-2l2-1.2-2-3.4-2.3.7a7.7 7.7 0 0 0-1.7-1l-.3-2.4h-4l-.3 2.4a7.7 7.7 0 0 0-1.7 1l-2.3-.7-2 3.4 2 1.2a7.8 7.8 0 0 0 .1 2l-2 1.2 2 3.4 2.3-.7a7.7 7.7 0 0 0 1.7 1l.3 2.4h4l.3-2.4a7.7 7.7 0 0 0 1.7-1l2.3.7 2-3.4-2-1.2z" />
+                </svg>
+            </button>
+            <button class="icon-button" id="database-btn" title="Database" aria-label="Open database tools">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <ellipse cx="12" cy="5" rx="7" ry="3" />
+                    <path d="M5 5v7c0 1.7 3.1 3 7 3s7-1.3 7-3V5" />
+                    <path d="M5 12v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Toast Notification Container -->
+    <div id="toast" class="toast" role="alert" aria-live="polite" aria-atomic="true"></div>
+    
+    <!-- Live Region for Status Announcements -->
+    <div id="status-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- ========================================
+         Filter Bar Component
+         ======================================== -->
+    <section class="filter-bar" id="filter-bar">
+        <div class="filter-search">
+            <input
+                type="text"
+                id="video-search-input"
+                class="form-input"
+                placeholder="Search videos or channels"
+                autocomplete="off"
+                aria-label="Search videos or channels"
+            >
+        </div>
+        <div class="tag-chips-container" id="tag-chips-container">
+            <!-- Tag chips will be dynamically inserted here -->
+            <button class="filter-chip active" data-tag="all">All</button>
+        </div>
+        <div class="filter-actions">
+            <div class="filter-toggle">
+                <label class="checkbox-wrapper">
+                    <input type="checkbox" id="unwatched-only" data-filter="unwatched">
+                    <span>Unwatched only</span>
+                </label>
+            </div>
+            <button class="filter-action-btn" id="mark-all-watched-btn" type="button">Mark all watched</button>
+        </div>
+    </section>
+
+    <!-- ========================================
+         Video Feed Container
+         ======================================== -->
+    <main class="video-feed" id="video-feed">
+        <div class="video-count" id="video-count" style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem; display: none;">
+            Showing <span id="video-count-value">0</span> videos
+        </div>
+        <div class="video-list" id="video-list">
+            <!-- Video cards will be dynamically inserted here -->
+        </div>
+        <div class="infinite-sentinel" id="infinite-sentinel" aria-hidden="true"></div>
+        
+        <!-- Empty State -->
+        <div class="empty-state" id="empty-state">
+            <div class="empty-state-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <rect x="3" y="5" width="18" height="12" rx="2" />
+                    <path d="M10 9l5 3-5 3z" />
+                    <path d="M8 21h8" />
+                </svg>
+            </div>
+            <h2 class="empty-state-title">No videos yet</h2>
+            <p class="empty-state-message">Add channels to start tracking your favorite YouTube creators.</p>
+        </div>
+    </main>
+
+    <!-- ========================================
+         Settings Modal
+         ======================================== -->
+    <div class="modal-overlay" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="settings-title">Settings</h2>
+                <button class="modal-close" id="modal-close" aria-label="Close settings">×</button>
+            </div>
+            <div class="modal-body">
+                <!-- API Key Input -->
+                <div class="form-group">
+                    <label class="form-label" for="api-key-input">YouTube API Key</label>
+                    <input
+                        type="password"
+                        id="api-key-input"
+                        class="form-input"
+                        placeholder="Enter your YouTube Data API v3 key"
+                        autocomplete="off"
+                    >
+                    <div class="status-message" id="api-key-status"></div>
+                </div>
+
+                <!-- Shorts Duration Setting -->
+                <div class="form-group">
+                    <label class="form-label" for="shorts-duration-input">
+                        Shorts Duration Threshold
+                        <span class="info-icon" id="shorts-duration-info" title="Videos shorter than this duration will be considered shorts">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4"/>
+                                <path d="M12 8h.01"/>
+                            </svg>
+                        </span>
+                    </label>
+                    <div class="input-with-suffix">
+                        <input
+                            type="number"
+                            id="shorts-duration-input"
+                            class="form-input"
+                            placeholder="60"
+                            min="1"
+                            max="3600"
+                            value="60"
+                        >
+                        <span class="input-suffix">seconds</span>
+                    </div>
+                    <div class="status-message" id="shorts-duration-status"></div>
+                </div>
+
+                <!-- Save Settings Button -->
+                <button class="btn" id="save-settings-btn" style="width: 100%;">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         Channels Modal
+         ======================================== -->
+    <div class="modal-overlay" id="channels-modal" role="dialog" aria-modal="true" aria-labelledby="channels-title">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="channels-title">Channels</h2>
+                <button class="modal-close" id="channels-close" aria-label="Close channels">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="channels-search-input">Search channels</label>
+                    <input
+                        type="text"
+                        id="channels-search-input"
+                        class="form-input"
+                        placeholder="Filter by name or ID"
+                        autocomplete="off"
+                    >
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tracked Channels</label>
+                    <div class="channel-list" id="channel-list">
+                        <div class="channel-list-empty" id="channel-list-empty">
+                            No channels added yet.
+                        </div>
+                        <!-- Channel items will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         Database Modal
+         ======================================== -->
+    <div class="modal-overlay" id="database-modal" role="dialog" aria-modal="true" aria-labelledby="database-title">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="database-title">Database</h2>
+                <button class="modal-close" id="database-close" aria-label="Close database tools">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="database-import-input">Import database</label>
+                    <input type="file" id="database-import-input" class="form-input" accept="application/json">
+                    <div class="status-message" id="database-import-status"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="database-export-btn">Export database</label>
+                    <button class="btn" id="database-export-btn" type="button" style="width: 100%;">Export JSON</button>
+                    <div class="status-message" id="database-export-status"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="database-delete-btn">Delete database</label>
+                    <button class="btn btn-danger" id="database-delete-btn" type="button" style="width: 100%;">Delete all data</button>
+                    <div class="status-message" id="database-delete-status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         Confirmation Modal
+         ======================================== -->
+    <div class="modal-overlay" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="confirm-title">Confirm Action</h2>
+                <button class="modal-close" id="confirm-close" aria-label="Close confirmation">×</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message" style="margin-bottom: 1.5rem; line-height: 1.6;"></p>
+                <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                    <button class="btn btn-secondary" id="confirm-cancel-btn" type="button">Cancel</button>
+                    <button class="btn btn-danger" id="confirm-ok-btn" type="button">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         Tag Input Popover
+         ======================================== -->
+    <div class="tag-popover" id="tag-popover">
+        <div class="tag-popover-header">
+            <input
+                type="text"
+                class="tag-popover-input"
+                id="tag-popover-input"
+                placeholder="Enter tag name"
+                autocomplete="off"
+                maxlength="20"
+            >
+            <button class="tag-popover-btn" id="tag-add-btn">Add</button>
+        </div>
+        <div class="tag-validation-error" id="tag-validation-error"></div>
+        <div class="tag-suggestions" id="tag-suggestions"></div>
+        <button class="tag-popover-cancel" id="tag-cancel-btn">Cancel</button>
+    </div>
+
+    <!-- ========================================
+         JavaScript Modules - Load in Dependency Order
+         ======================================== -->
+    <!-- Initialize namespace first -->
+    <script>globalThis.LatestTube = globalThis.LatestTube || {};</script>
+    
+    <!-- 1. Utilities (no dependencies) -->
+    <script src="js/modules/utils.js"></script>
+    
+    <!-- 2. Database Layer (no dependencies) -->
+    <script src="js/modules/db.js"></script>
+    
+    <!-- 3. YouTube API Module (no dependencies) -->
+    <script src="js/modules/youtube-api.js"></script>
+    
+    <!-- 4. Fetch Service (depends on DB and YouTube API) -->
+    <script src="js/modules/fetch-service.js"></script>
+    
+    <!-- 5. Tags Module (depends on DB) -->
+    <script src="js/modules/tags.js"></script>
+    
+    <!-- 6. Video Feed Module (depends on DB, Tags, Utils) -->
+    <script src="js/modules/video-feed.js"></script>
+    
+    <!-- 7. Filters Module (depends on VideoFeed) -->
+    <script src="js/modules/filters.js"></script>
+    
+    <!-- 8. UI/Settings Module (depends on DB, FetchService, VideoFeed, Filters, Utils) -->
+    <script src="js/modules/ui.js"></script>
+    
+    <!-- 9. App Initialization (depends on everything) -->
+    <script src="js/modules/app-init.js"></script>
+    
+    <!-- Tooltip for shorts info (moved to body level for proper z-index) -->
+    <div class="tooltip-overlay" id="shorts-tooltip">
+        <div class="tooltip-content">
+            <p>"Shorts" are defined by video duration.</p>
+            <p>Configure the threshold in Settings.</p>
+            <button class="tooltip-close" id="shorts-tooltip-close">Got it</button>
+        </div>
+    </div>
+
+    <!-- Initialize App on Page Load -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (globalThis.LatestTube && globalThis.LatestTube.App) {
+                globalThis.LatestTube.App.init();
+            } else {
+                console.error('LatestTube: App module not loaded');
+            }
+        });
+    </script>
+</body>
+</html>
