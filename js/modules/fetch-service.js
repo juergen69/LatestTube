@@ -150,6 +150,30 @@
     }
 
     /**
+     * Get the timestamp to use for fetching videos from a channel.
+     * Uses the most recent watched video's timestamp to avoid re-fetching old watched videos.
+     * Falls back to 6 months ago if no watched videos exist.
+     * @param {string} channelId
+     * @returns {Promise<Date>}
+     */
+    async function getFetchSinceDate(channelId) {
+        try {
+            const lastWatched = await globalThis.LatestTube.DB.videos.getLastWatchedTimestamp(channelId);
+            if (lastWatched) {
+                console.log(`FetchService: Using last watched timestamp ${lastWatched.toISOString()} for channel ${channelId}`);
+                return lastWatched;
+            }
+        } catch (error) {
+            console.warn(`FetchService: Error getting last watched timestamp for ${channelId}`, error);
+        }
+
+        // Default: 6 months ago
+        const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000);
+        console.log(`FetchService: No watched videos found, using default 6-month cutoff ${sixMonthsAgo.toISOString()}`);
+        return sixMonthsAgo;
+    }
+
+    /**
      * Refresh a single channel - fetch info and videos.
      * OPTIMIZATION: Reuses cached channel info (uploadsPlaylistId) from IndexedDB
      * when available, saving 1 API quota unit per existing channel refresh.
@@ -168,10 +192,14 @@
             // Get shorts duration threshold from settings
             const shortsDurationThreshold = await getShortsDurationThreshold();
 
+            // Get the timestamp of the most recent watched video to use as fetch starting point
+            // This prevents old watched videos from reappearing after being pruned
+            const sinceDate = await getFetchSinceDate(channelId);
+
             // Fetch videos (with cached channel info if available)
             const { channelInfo, videos } = await globalThis.LatestTube.YouTube.fetchAllChannelVideos(
                 channelId,
-                null,
+                sinceDate,
                 cachedChannelInfo,
                 {
                     includeShorts: options.includeShorts !== false,

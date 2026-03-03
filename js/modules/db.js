@@ -620,6 +620,48 @@
         },
 
         /**
+         * Get the timestamp of the most recent watched video for a channel
+         * @param {string} channelId
+         * @returns {Promise<Date|null>} - Date of most recent watched video, or null if none
+         */
+        getLastWatchedTimestamp(channelId) {
+            return new Promise((resolve, reject) => {
+                if (!dbInstance) {
+                    ensureDb().then(() => videos.getLastWatchedTimestamp(channelId)).then(resolve).catch(reject);
+                    return;
+                }
+
+                const transaction = dbInstance.transaction([STORES.VIDEOS], 'readonly');
+                const store = transaction.objectStore(STORES.VIDEOS);
+                const index = store.index('channelId');
+                const request = index.getAll(channelId);
+
+                request.onerror = () => {
+                    console.error('IndexedDB: Error getting videos for last watched timestamp', channelId, request.error);
+                    reject(request.error);
+                };
+
+                request.onsuccess = () => {
+                    const channelVideos = request.result || [];
+                    const watchedVideos = channelVideos.filter(video => video.watched);
+
+                    if (watchedVideos.length === 0) {
+                        resolve(null);
+                        return;
+                    }
+
+                    // Find the most recent watched video by publishedAt
+                    const mostRecent = watchedVideos.reduce((latest, video) => {
+                        const videoDate = new Date(video.publishedAt);
+                        return videoDate > latest ? videoDate : latest;
+                    }, new Date(0));
+
+                    resolve(mostRecent);
+                };
+            });
+        },
+
+        /**
          * Get a video by ID
          * @param {string} videoId
          * @returns {Promise<Object>}
