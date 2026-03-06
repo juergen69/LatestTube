@@ -591,6 +591,185 @@
             margin: 0 auto;
         }
 
+        /* ========================================
+           Welcome Message (First Run)
+           ======================================== */
+        .welcome-message {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            max-width: 520px;
+            margin: 2rem auto;
+        }
+
+        .welcome-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            color: var(--accent);
+            opacity: 0.9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .welcome-icon svg {
+            width: 100%;
+            height: 100%;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.6;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .welcome-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        .welcome-subtitle {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        .privacy-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(56, 142, 60, 0.15));
+            border: 1px solid rgba(76, 175, 80, 0.4);
+            padding: 0.625rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            color: #81c784;
+            font-weight: 600;
+            font-size: 0.9375rem;
+        }
+
+        .privacy-icon {
+            width: 20px;
+            height: 20px;
+            stroke: #81c784;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex-shrink: 0;
+        }
+
+        .welcome-description {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            max-width: 440px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .welcome-description strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .welcome-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            text-align: left;
+            max-width: 360px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .welcome-step {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .step-number {
+            width: 28px;
+            height: 28px;
+            background-color: var(--accent);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+            flex-shrink: 0;
+        }
+
+        .step-text {
+            color: var(--text-primary);
+            font-size: 0.9375rem;
+        }
+
+        .welcome-btn {
+            padding: 0.875rem 2.5rem;
+            font-size: 1.0625rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .welcome-privacy-note {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            max-width: 400px;
+            margin: 0 auto;
+            line-height: 1.5;
+            opacity: 0.85;
+        }
+
+        .note-icon {
+            width: 16px;
+            height: 16px;
+            stroke: var(--text-secondary);
+            fill: none;
+            stroke-width: 2;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        /* Responsive welcome message */
+        @media (max-width: 768px) {
+            .welcome-message {
+                padding: 2rem 1rem;
+            }
+
+            .welcome-title {
+                font-size: 1.625rem;
+            }
+
+            .welcome-icon {
+                width: 64px;
+                height: 64px;
+            }
+
+            .privacy-badge {
+                font-size: 0.8125rem;
+                padding: 0.5rem 0.875rem;
+            }
+
+            .welcome-step {
+                padding: 0.625rem 0.875rem;
+            }
+        }
+
         .infinite-sentinel {
             width: 100%;
             height: 1px;

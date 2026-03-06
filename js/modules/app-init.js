@@ -71,7 +71,9 @@
             }
 
             // 4. Handle first run UI
-            if (!hasApiKey) {
+            if (!hasApiKey && !hasChannels) {
+                showFirstRunUI('welcome');
+            } else if (!hasApiKey) {
                 showFirstRunUI('apiKey');
             } else if (!hasChannels) {
                 showFirstRunUI('channels');
@@ -97,10 +99,12 @@
 
     /**
      * Show first run UI based on type
-     * @param {string} type - 'apiKey' or 'channels'
+     * @param {string} type - 'apiKey' or 'channels' or 'welcome'
      */
     function showFirstRunUI(type) {
-        if (type === 'apiKey') {
+        if (type === 'welcome') {
+            showWelcomeMessage();
+        } else if (type === 'apiKey') {
             globalThis.LatestTube.VideoFeed.renderEmptyState(
                 'To get started, please add your YouTube Data API v3 key in settings.\nDon\'t have one? Get it free from Google Cloud Console.',
                 'Welcome to LatestTube!'
@@ -119,6 +123,48 @@
 
             settingsBtn.classList.add('pulse');
         }
+    }
+
+    /**
+     * Show the welcome message for first-time users
+     */
+    function showWelcomeMessage() {
+        const welcomeMessageEl = document.getElementById('welcome-message');
+        const emptyStateEl = document.getElementById('empty-state');
+        const videoListEl = document.getElementById('video-list');
+
+        if (!welcomeMessageEl) return;
+
+        // Hide empty state and video list
+        if (emptyStateEl) emptyStateEl.style.display = 'none';
+        if (videoListEl) videoListEl.style.display = 'none';
+
+        // Show welcome message
+        welcomeMessageEl.style.display = 'block';
+
+        // Add click handler for Get Started button
+        const getStartedBtn = document.getElementById('welcome-get-started-btn');
+        if (getStartedBtn) {
+            getStartedBtn.addEventListener('click', handleWelcomeGetStarted);
+        }
+
+        console.log('App: Showing welcome message');
+    }
+
+    /**
+     * Handle Get Started button click from welcome screen
+     */
+    function handleWelcomeGetStarted() {
+        const welcomeMessageEl = document.getElementById('welcome-message');
+
+        // Hide welcome message
+        if (welcomeMessageEl) welcomeMessageEl.style.display = 'none';
+
+        // Open settings to let user add API key
+        settingsBtn.classList.add('pulse');
+        setTimeout(() => {
+            globalThis.LatestTube.Settings.open();
+        }, 300);
     }
 
     /**
@@ -432,6 +478,7 @@
         init,
         checkFirstRun,
         showFirstRunUI,
+        showWelcomeMessage,
         startBackgroundRefresh,
         showRefreshStatus,
         hideRefreshStatus,
