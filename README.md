@@ -178,3 +178,14 @@ The MIT License was chosen because it:
 - Is simple and easy to understand
 - Is compatible with nearly all other licenses
 - Matches the privacy-first philosophy of LatestTube — use it however you want, just keep the credit
+
+## AI Assisted project, generated with KiloCode
+
+### Initial Starting Prompt
+Plan a browser-only YouTube channel tracker app with watchlist, tags, filters, and local storage using browser DB technology
+
+### Models Used
+Planning: Sonnet 4.6 Opus
+Coding: MiniMax 2.5, Kimi K2.5, also KiloAuto:free
+
+Agent and Kilomode files used in the project are still included so you can easily continue.
