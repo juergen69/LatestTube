@@ -4,8 +4,6 @@ Your personal You Tube Channel tracker - get informed when your favorite channel
 
 All you need is a You Tube API Key
 
-![LatestTube in Action](latesttube.png)
-
 ## What is LatestTube
 
 LatestTube is a simple, privacy-focused tool for tracking videos from your favorite YouTube channels. It's designed as a single HTML file that you can open directly in your browser—no installation, no build step, and no server required.
