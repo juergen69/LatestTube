@@ -278,46 +278,39 @@
     }
 
     /**
-     * Reinitialize database after deletion
-     * @param {Function} resolve
-     * @param {Function} reject
-     */
-    function reinitializeAfterDelete(resolve, reject) {
-        // Just set dbInstance to null - the page reload will reinitialize properly
-        dbInstance = null;
-        resolve();
-    }
-
-    /**
      * Reset database by clearing all data (alternative to deleting DB)
      * @returns {Promise<void>}
      */
     function resetDatabase() {
-        return new Promise(async (resolve, reject) => {
-            try {
-                // Ensure we have a database connection
-                const db = await ensureDb();
-                
-                // Clear all stores
-                const storeNames = [STORES.SETTINGS, STORES.CHANNELS, STORES.VIDEOS, STORES.CHANNEL_TAGS];
-                
-                for (const storeName of storeNames) {
-                    const transaction = db.transaction(storeName, 'readwrite');
-                    const store = transaction.objectStore(storeName);
-                    const clearRequest = store.clear();
-                    
-                    await new Promise((res, rej) => {
-                        clearRequest.onsuccess = () => res();
-                        clearRequest.onerror = () => rej(clearRequest.error);
-                    });
-                }
-                
-                console.log('IndexedDB: All stores cleared');
-                resolve();
-            } catch (error) {
-                console.error('IndexedDB: Failed to clear database', error);
-                reject(error);
-            }
+        return ensureDb().then((db) => {
+            const storeNames = [STORES.SETTINGS, STORES.CHANNELS, STORES.VIDEOS, STORES.CHANNEL_TAGS];
+            
+            // Clear each store sequentially using promise chain
+            return storeNames.reduce((promise, storeName) => {
+                return promise.then(() => clearStore(db, storeName));
+            }, Promise.resolve());
+        }).then(() => {
+            console.log('IndexedDB: All stores cleared');
+        }).catch((error) => {
+            console.error('IndexedDB: Failed to clear database', error);
+            throw error;
+        });
+    }
+
+    /**
+     * Clear a single store
+     * @param {IDBDatabase} db
+     * @param {string} storeName
+     * @returns {Promise<void>}
+     */
+    function clearStore(db, storeName) {
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.clear();
+            
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
         });
     }
 
@@ -665,13 +658,10 @@
                         return;
                     }
 
-                    // Find the most recent watched video by publishedAt
-                    const mostRecent = watchedVideos.reduce((latest, video) => {
-                        const videoDate = new Date(video.publishedAt);
-                        return videoDate > latest ? videoDate : latest;
-                    }, new Date(0));
-
-                    resolve(mostRecent);
+                    // Find the most recent watched video by publishedAt using Math.max
+                    const timestamps = watchedVideos.map(video => new Date(video.publishedAt).getTime());
+                    const mostRecentTimestamp = Math.max(...timestamps, 0);
+                    resolve(new Date(mostRecentTimestamp));
                 };
             });
         },

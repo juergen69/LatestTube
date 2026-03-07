@@ -541,17 +541,9 @@
             // Show first-run UI if needed
             const apiKey = await globalThis.LatestTube.DB.settings.get('apiKey');
             const channels = await globalThis.LatestTube.DB.channels.getAll();
-            
-            if (!apiKey && channels.length === 0) {
-                globalThis.LatestTube.VideoFeed?.renderEmptyState?.(
-                    'To get started, please add your YouTube Data API v3 key in settings.\nDon\'t have one? Get it free from Google Cloud Console.',
-                    'Welcome to LatestTube!'
-                );
-                settingsBtn?.classList?.add('pulse');
-                setTimeout(() => {
-                    globalThis.LatestTube.Settings?.open?.();
-                }, 500);
-            } else if (!apiKey) {
+
+            if (!apiKey) {
+                // No API key - show appropriate message and open settings
                 globalThis.LatestTube.VideoFeed?.renderEmptyState?.(
                     'To get started, please add your YouTube Data API v3 key in settings.\nDon\'t have one? Get it free from Google Cloud Console.',
                     'Welcome to LatestTube!'

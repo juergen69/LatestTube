@@ -47,37 +47,11 @@
 
             // 3. Load initial data if we have channels
             if (hasChannels) {
-                // Restore saved filter state before first render
-                if (globalThis.LatestTube.Filters?.loadSavedFilters) {
-                    await globalThis.LatestTube.Filters.loadSavedFilters();
-                }
-                console.log('App: Loading videos from database...');
-                const savedFilters = globalThis.LatestTube.Filters?.getCurrentFilters?.() || {};
-                const videos = await globalThis.LatestTube.VideoFeed.loadVideos(savedFilters);
-                await globalThis.LatestTube.VideoFeed.renderVideos(videos);
-
-                // Update video count
-                const videoCountElement = document.getElementById('video-count');
-                const videoCountValue = document.getElementById('video-count-value');
-                if (videoCountValue && videoCountElement) {
-                    videoCountValue.textContent = videos.length;
-                    videoCountElement.style.display = videos.length > 0 ? 'block' : 'none';
-                }
-
-                // Render filter chips
-                await globalThis.LatestTube.Filters.renderFilterChips();
-                // Ensure filter UI matches restored state
-                await globalThis.LatestTube.Filters.applyFilters();
+                await loadInitialData();
             }
 
             // 4. Handle first run UI
-            if (!hasApiKey && !hasChannels) {
-                showFirstRunUI('welcome');
-            } else if (!hasApiKey) {
-                showFirstRunUI('apiKey');
-            } else if (!hasChannels) {
-                showFirstRunUI('channels');
-            }
+            handleFirstRunUI(hasApiKey, hasChannels);
 
             // 5. Start background refresh (if conditions met)
             if (hasApiKey && hasChannels) {
@@ -90,6 +64,49 @@
         } catch (error) {
             console.error('App: Initialization failed:', error);
             showToast('Failed to initialize app. Please refresh the page.', 'error');
+        }
+    }
+
+    /**
+     * Load initial data including filters and videos
+     * @returns {Promise<void>}
+     */
+    async function loadInitialData() {
+        // Restore saved filter state before first render
+        if (globalThis.LatestTube.Filters?.loadSavedFilters) {
+            await globalThis.LatestTube.Filters.loadSavedFilters();
+        }
+        console.log('App: Loading videos from database...');
+        const savedFilters = globalThis.LatestTube.Filters?.getCurrentFilters?.() || {};
+        const videos = await globalThis.LatestTube.VideoFeed.loadVideos(savedFilters);
+        await globalThis.LatestTube.VideoFeed.renderVideos(videos);
+
+        // Update video count
+        const videoCountElement = document.getElementById('video-count');
+        const videoCountValue = document.getElementById('video-count-value');
+        if (videoCountValue && videoCountElement) {
+            videoCountValue.textContent = videos.length;
+            videoCountElement.style.display = videos.length > 0 ? 'block' : 'none';
+        }
+
+        // Render filter chips
+        await globalThis.LatestTube.Filters.renderFilterChips();
+        // Ensure filter UI matches restored state
+        await globalThis.LatestTube.Filters.applyFilters();
+    }
+
+    /**
+     * Handle first run UI based on API key and channel state
+     * @param {boolean} hasApiKey
+     * @param {boolean} hasChannels
+     */
+    function handleFirstRunUI(hasApiKey, hasChannels) {
+        if (!hasApiKey && !hasChannels) {
+            showFirstRunUI('welcome');
+        } else if (!hasApiKey) {
+            showFirstRunUI('apiKey');
+        } else if (!hasChannels) {
+            showFirstRunUI('channels');
         }
     }
 

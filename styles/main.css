@@ -645,7 +645,7 @@
             padding: 0.625rem 1rem;
             border-radius: 8px;
             margin-bottom: 1.5rem;
-            color: #81c784;
+            color: #4caf50;
             font-weight: 600;
             font-size: 0.9375rem;
         }
@@ -653,7 +653,7 @@
         .privacy-icon {
             width: 20px;
             height: 20px;
-            stroke: #81c784;
+            stroke: #4caf50;
             fill: none;
             stroke-width: 2;
             stroke-linecap: round;
