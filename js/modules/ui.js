@@ -45,6 +45,10 @@
     const saveSettingsBtn = document.getElementById('save-settings-btn');
     const shortsDurationStatus = document.getElementById('shorts-duration-status');
 
+    // Max videos per channel setting elements
+    const maxVideosInput = document.getElementById('max-videos-input');
+    const maxVideosStatus = document.getElementById('max-videos-status');
+
     // Info icon and tooltip elements
     const includeShortsInfo = document.getElementById('include-shorts-info');
     const shortsTooltip = document.getElementById('shorts-tooltip');
@@ -147,6 +151,7 @@
         // Load data when modal opens
         loadApiKey();
         loadShortsDuration();
+        loadMaxVideos();
 
         // Focus first input
         const firstInput = settingsModal.querySelector('input');
@@ -523,13 +528,45 @@
         if (!confirmed) return;
         try {
             await globalThis.LatestTube.DB.resetDatabase();
-            await importSettings(settings);
-            await importChannels(channels);
-            await importVideos(videos);
-            await importTags(channelTags);
+            showStatus(databaseDeleteStatus, 'Database deleted successfully.', 'success');
+            
+            // Close modals
+            closeConfirmModal(false);
+            closeDatabaseModal();
+            
+            // Refresh the UI to show empty state
             await globalThis.LatestTube.VideoFeed?.refresh?.();
             await globalThis.LatestTube.Filters?.renderFilterChips?.();
-            showStatus(databaseDeleteStatus, 'Database deleted successfully.', 'success');
+            
+            // Show first-run UI if needed
+            const apiKey = await globalThis.LatestTube.DB.settings.get('apiKey');
+            const channels = await globalThis.LatestTube.DB.channels.getAll();
+            
+            if (!apiKey && channels.length === 0) {
+                globalThis.LatestTube.VideoFeed?.renderEmptyState?.(
+                    'To get started, please add your YouTube Data API v3 key in settings.\nDon\'t have one? Get it free from Google Cloud Console.',
+                    'Welcome to LatestTube!'
+                );
+                settingsBtn?.classList?.add('pulse');
+                setTimeout(() => {
+                    globalThis.LatestTube.Settings?.open?.();
+                }, 500);
+            } else if (!apiKey) {
+                globalThis.LatestTube.VideoFeed?.renderEmptyState?.(
+                    'To get started, please add your YouTube Data API v3 key in settings.\nDon\'t have one? Get it free from Google Cloud Console.',
+                    'Welcome to LatestTube!'
+                );
+                settingsBtn?.classList?.add('pulse');
+                setTimeout(() => {
+                    globalThis.LatestTube.Settings?.open?.();
+                }, 500);
+            } else if (channels.length === 0) {
+                globalThis.LatestTube.VideoFeed?.renderEmptyState?.(
+                    'You have an API key configured. Now add your favorite YouTube channels to start tracking videos!',
+                    'Add Your First Channel'
+                );
+                settingsBtn?.classList?.add('pulse');
+            }
         } catch (error) {
             console.error('Database: Delete failed', error);
             showStatus(databaseDeleteStatus, 'Failed to delete database.', 'error');
@@ -594,7 +631,24 @@
     }
 
     /**
-     * Saves all settings (API key and shorts duration)
+     * Loads max videos per channel setting from IndexedDB
+     */
+    async function loadMaxVideos() {
+        try {
+            const maxVideos = await globalThis.LatestTube.DB.settings.get('maxVideosPerChannel');
+            if (maxVideos !== undefined && maxVideos !== null && !Number.isNaN(maxVideos)) {
+                maxVideosInput.value = maxVideos;
+            } else {
+                maxVideosInput.value = '10'; // Default value
+            }
+        } catch (error) {
+            console.error('Settings: Error loading max videos setting', error);
+            maxVideosInput.value = '10';
+        }
+    }
+
+    /**
+     * Saves all settings (API key, shorts duration, and max videos per channel)
      */
     async function saveSettings() {
         try {
@@ -611,9 +665,22 @@
                 return; // Don't close if duration is invalid
             }
 
-            // Save both settings
+            const maxVideos = Number.parseInt(maxVideosInput.value, 10);
+            if (Number.isNaN(maxVideos) || maxVideos < 1 || maxVideos > 50) {
+                showStatus(maxVideosStatus, 'Please enter a valid number (1-50)', 'error');
+                return; // Don't close if maxVideos is invalid
+            }
+
+            // Save all settings
             await globalThis.LatestTube.DB.settings.set('apiKey', apiKey);
             await globalThis.LatestTube.DB.settings.set('shortsDuration', duration);
+            await globalThis.LatestTube.DB.settings.set('maxVideosPerChannel', maxVideos);
+
+            // Remove pulse notification from settings button after successful save
+            const settingsBtn = document.getElementById('settings-btn');
+            if (settingsBtn) {
+                settingsBtn.classList.remove('pulse');
+            }
 
             // Close the settings modal after successful save
             closeModal();

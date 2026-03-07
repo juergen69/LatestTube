@@ -237,6 +237,30 @@
                     <div class="status-message" id="shorts-duration-status"></div>
                 </div>
 
+                <!-- Max Videos Per Channel Setting -->
+                <div class="form-group">
+                    <label class="form-label" for="max-videos-input">
+                        Max Videos Per Channel
+                        <span class="info-icon" id="max-videos-info" title="Maximum number of videos to fetch per channel on each refresh">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4"/>
+                                <path d="M12 8h.01"/>
+                            </svg>
+                        </span>
+                    </label>
+                    <input
+                        type="number"
+                        id="max-videos-input"
+                        class="form-input"
+                        placeholder="10"
+                        min="1"
+                        max="50"
+                        value="10"
+                    >
+                    <div class="status-message" id="max-videos-status"></div>
+                </div>
+
                 <!-- Save Settings Button -->
                 <button class="btn" id="save-settings-btn" style="width: 100%;">Save Settings</button>
             </div>

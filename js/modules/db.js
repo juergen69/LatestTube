@@ -30,7 +30,10 @@
      */
     function handleVersionChange() {
         console.warn('IndexedDB: Version change detected, closing database');
-        dbInstance.close();
+        if (dbInstance) {
+            dbInstance.close();
+            dbInstance = null;
+        }
     }
 
     /**
@@ -280,29 +283,41 @@
      * @param {Function} reject
      */
     function reinitializeAfterDelete(resolve, reject) {
+        // Just set dbInstance to null - the page reload will reinitialize properly
         dbInstance = null;
-        init().then(() => resolve()).catch(reject);
+        resolve();
     }
 
     /**
-     * Reset database by deleting and re-initializing schema
+     * Reset database by clearing all data (alternative to deleting DB)
      * @returns {Promise<void>}
      */
     function resetDatabase() {
-        return new Promise((resolve, reject) => {
-            const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-
-            deleteRequest.onerror = () => {
-                console.error('IndexedDB: Failed to delete database', deleteRequest.error);
-                reject(deleteRequest.error);
-            };
-
-            deleteRequest.onblocked = () => {
-                console.warn('IndexedDB: Delete blocked - close other tabs using this app');
-                reject(new Error('Database delete blocked'));
-            };
-
-            deleteRequest.onsuccess = () => reinitializeAfterDelete(resolve, reject);
+        return new Promise(async (resolve, reject) => {
+            try {
+                // Ensure we have a database connection
+                const db = await ensureDb();
+                
+                // Clear all stores
+                const storeNames = [STORES.SETTINGS, STORES.CHANNELS, STORES.VIDEOS, STORES.CHANNEL_TAGS];
+                
+                for (const storeName of storeNames) {
+                    const transaction = db.transaction(storeName, 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const clearRequest = store.clear();
+                    
+                    await new Promise((res, rej) => {
+                        clearRequest.onsuccess = () => res();
+                        clearRequest.onerror = () => rej(clearRequest.error);
+                    });
+                }
+                
+                console.log('IndexedDB: All stores cleared');
+                resolve();
+            } catch (error) {
+                console.error('IndexedDB: Failed to clear database', error);
+                reject(error);
+            }
         });
     }
 

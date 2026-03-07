@@ -390,6 +390,22 @@
     }
 
     /**
+     * Get max videos per channel from settings
+     * @returns {Promise<number>}
+     */
+    async function getMaxVideosPerChannel() {
+        try {
+            const maxVideos = await globalThis.LatestTube.DB.settings.get('maxVideosPerChannel');
+            if (maxVideos !== undefined && maxVideos !== null && !Number.isNaN(maxVideos) && maxVideos > 0) {
+                return maxVideos;
+            }
+        } catch (error) {
+            console.warn('YouTube API: Could not load max videos setting, using default', error);
+        }
+        return 10; // Default: 10 videos per channel
+    }
+
+    /**
      * Check if video should be included based on options
      * @param {Object} video
      * @param {Date} sixMonthsAgo
@@ -467,9 +483,9 @@
      * @returns {Promise<Object>} - { channelInfo, videos }
      */
     async function fetchAllChannelVideos(channelId, sinceDate = null, cachedChannelInfo = null, options = {}) {
-        const MAX_VIDEOS_PER_CHANNEL = 10;
         const includeShorts = options.includeShorts !== false;
         const shortsDurationThreshold = options.shortsDurationThreshold || await getShortsDurationThreshold();
+        const maxVideosPerChannel = options.maxVideosPerChannel || await getMaxVideosPerChannel();
         let channelInfo;
 
         // Use cached channel info if available (saves 1 quota unit)
@@ -502,7 +518,7 @@
                 shortsDurationThreshold,
                 includeShorts,
                 resolvedChannelId,
-                MAX_VIDEOS_PER_CHANNEL
+                maxVideosPerChannel
             );
 
             allVideos.push(...processedVideos);
