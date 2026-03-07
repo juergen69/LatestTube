@@ -640,12 +640,12 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(56, 142, 60, 0.15));
+            background: #134E1A;
             border: 1px solid rgba(76, 175, 80, 0.4);
             padding: 0.625rem 1rem;
             border-radius: 8px;
             margin-bottom: 1.5rem;
-            color: #a5d6a7;
+            color: #7FC782;
             font-weight: 600;
             font-size: 0.9375rem;
         }
