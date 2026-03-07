@@ -192,6 +192,21 @@
     }
 
     /**
+     * Find the most recent watched timestamp from a list of videos
+     * @param {Array} channelVideos - Array of video objects
+     * @returns {Date|null} - Most recent watched timestamp or null if none
+     */
+    function findMostRecentWatchedTimestamp(channelVideos) {
+        const watchedVideos = channelVideos.filter(video => video.watched);
+        if (watchedVideos.length === 0) {
+            return null;
+        }
+        const timestamps = watchedVideos.map(video => new Date(video.publishedAt).getTime());
+        const mostRecentTimestamp = Math.max(...timestamps, 0);
+        return new Date(mostRecentTimestamp);
+    }
+
+    /**
      * Migrate videoTags to channelTags
      * @param {IDBTransaction} transaction
      * @param {IDBDatabase} db
@@ -281,20 +296,14 @@
      * Reset database by clearing all data (alternative to deleting DB)
      * @returns {Promise<void>}
      */
-    function resetDatabase() {
-        return ensureDb().then((db) => {
-            const storeNames = [STORES.SETTINGS, STORES.CHANNELS, STORES.VIDEOS, STORES.CHANNEL_TAGS];
-            
-            // Clear each store sequentially using promise chain
-            return storeNames.reduce((promise, storeName) => {
-                return promise.then(() => clearStore(db, storeName));
-            }, Promise.resolve());
-        }).then(() => {
-            console.log('IndexedDB: All stores cleared');
-        }).catch((error) => {
-            console.error('IndexedDB: Failed to clear database', error);
-            throw error;
-        });
+    async function resetDatabase() {
+        const db = await ensureDb();
+        const storeNames = [STORES.SETTINGS, STORES.CHANNELS, STORES.VIDEOS, STORES.CHANNEL_TAGS];
+        
+        for (const storeName of storeNames) {
+            await clearStore(db, storeName);
+        }
+        console.log('IndexedDB: All stores cleared');
     }
 
     /**
@@ -650,18 +659,7 @@
                 };
 
                 request.onsuccess = () => {
-                    const channelVideos = request.result || [];
-                    const watchedVideos = channelVideos.filter(video => video.watched);
-
-                    if (watchedVideos.length === 0) {
-                        resolve(null);
-                        return;
-                    }
-
-                    // Find the most recent watched video by publishedAt using Math.max
-                    const timestamps = watchedVideos.map(video => new Date(video.publishedAt).getTime());
-                    const mostRecentTimestamp = Math.max(...timestamps, 0);
-                    resolve(new Date(mostRecentTimestamp));
+                    resolve(findMostRecentWatchedTimestamp(request.result));
                 };
             });
         },

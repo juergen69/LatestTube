@@ -102,12 +102,33 @@
      */
     function handleFirstRunUI(hasApiKey, hasChannels) {
         if (!hasApiKey && !hasChannels) {
-            showFirstRunUI('welcome');
+            handleWelcomeState();
         } else if (!hasApiKey) {
-            showFirstRunUI('apiKey');
+            handleApiKeyMissingState();
         } else if (!hasChannels) {
-            showFirstRunUI('channels');
+            handleNoChannelsState();
         }
+    }
+
+    /**
+     * Handle welcome state - no API key and no channels
+     */
+    function handleWelcomeState() {
+        showFirstRunUI('welcome');
+    }
+
+    /**
+     * Handle API key missing state - has channels but no API key
+     */
+    function handleApiKeyMissingState() {
+        showFirstRunUI('apiKey');
+    }
+
+    /**
+     * Handle no channels state - has API key but no channels
+     */
+    function handleNoChannelsState() {
+        showFirstRunUI('channels');
     }
 
     // ========================================
