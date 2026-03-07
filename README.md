@@ -10,9 +10,8 @@ LatestTube is a simple, privacy-focused tool for tracking videos from your favor
 
 **Key highlights:**
 
-- **Single-page app**: Simple to deploy—just open `index.html` in a browser
+- **No deploy needed**: Simple open `index.html` in a browser
 - **Privacy-focused**: All data stays in your browser's IndexedDB; no accounts, no tracking, no data leaves your device—you have full control
-- **Works offline**: After the initial load and video metadata fetch, it works without an internet connection
 - **Zero external dependencies**: No npm packages, no CDNs, no frameworks—just vanilla JavaScript
 
 ## Features
@@ -23,7 +22,6 @@ LatestTube is a simple, privacy-focused tool for tracking videos from your favor
 - 🔍 **Filter by tags and watched status** — Focus on unwatched content or specific topics
 - ✅ **Mark videos as watched/unwatched** — Keep track of what you've seen
 - 🌙 **Dark theme UI** — Easy on the eyes, day or night
-- 📴 **Works offline after initial load** — No internet required once video list is fetched
 - 🚫 **Zero external dependencies** — Self-contained, no third-party libraries
 
 ## Getting Started
@@ -44,10 +42,9 @@ Before you can use LatestTube, you'll need a free API key from Google:
 
 No installation required:
 
-1. Simply open `index.html` in Chrome, Firefox, or Edge
+1. Simply open `index.html` in Chrome, Firefox, Opera or Edge
 2. No build step or server needed
 3. Works directly from `file://` protocol—just double-click the file
-4. The app uses external JS/CSS files that must be in the same folder
 
 ## Usage
 
@@ -55,9 +52,11 @@ No installation required:
 
 On first launch:
 
-1. The settings modal opens automatically
-2. Paste your YouTube API key in the input field
-3. Click **"Save"**
+1. You will be greeted by the welcome screen
+2. Getting started will open the settings 
+3. Paste your YouTube API key in the input field
+4. Ajust default values (optional)
+5. Click **"Save"**
 
 Your API key is stored locally in your browser and is never sent anywhere except to YouTube's API.
 
@@ -117,11 +116,11 @@ Check for new videos:
 
 | Aspect | Details |
 |--------|---------|
-| **Architecture** | Single HTML file with separate JS/CSS modules |
+| **Architecture** | Single HTML file with separate JS/CSS/images modules |
 | **Storage** | Browser's IndexedDB for channels, videos, tags, and settings |
 | **API Usage** | Uses efficient `playlistItems` endpoint (1 quota unit per 50 videos) |
 | **Quota** | Default 10,000 units/day = ~300 full refreshes |
-| **Offline Support** | Works offline after initial video list fetch; no network required for browsing the cached list |
+| **Offline Support** | Works offline after initial video list fetch; no network required for browsing the cached list (to watch the video you need a connection of course) |
 
 ### How It Works
 
@@ -157,4 +156,18 @@ LatestTube works in all modern browsers that support IndexedDB:
 
 ## License
 
-[Choose your license]
+LatestTube is open source and available under the [MIT License](https://opensource.org/licenses/MIT).
+
+### What this means:
+
+- ✅ You can use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of this software
+- ✅ You must include the copyright notice and permission notice in all copies or substantial portions of the software
+- ✅ This software is provided "as is", without warranty of any kind
+
+### Why MIT?
+
+The MIT License was chosen because it:
+- Allows maximum freedom for users to adapt the software to their needs
+- Is simple and easy to understand
+- Is compatible with nearly all other licenses
+- Matches the privacy-first philosophy of LatestTube — use it however you want, just keep the credit

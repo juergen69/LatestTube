@@ -355,16 +355,19 @@
            Video Feed Container
            ======================================== */
         .video-feed {
+            flex: 1;
             padding: 1.5rem;
             max-width: 1400px;
             margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .video-list {
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 1rem;
-            justify-content: center;
+            width: 100%;
         }
 
         /* Video Card Placeholder */
@@ -1504,6 +1507,8 @@
 
             .video-feed {
                 padding: 1rem;
+                width: 100%;
+                box-sizing: border-box;
             }
 
             .video-card {
@@ -1546,12 +1551,15 @@
         @media (min-width: 769px) and (max-width: 1200px) {
             .video-feed {
                 padding: 1.25rem;
-                max-width: 1200px;
+                max-width: 100%;
+                width: 100%;
+                box-sizing: border-box;
             }
 
             .video-list {
-                grid-template-columns: repeat(auto-fit, minmax(320px, 420px));
+                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
                 gap: 1.25rem;
+                width: 100%;
             }
 
             .video-card {
@@ -1578,12 +1586,15 @@
 
         @media (min-width: 1201px) {
             .video-feed {
-                max-width: 1600px;
+                max-width: 100%;
+                width: 100%;
+                box-sizing: border-box;
             }
 
             .video-list {
-                grid-template-columns: repeat(auto-fit, minmax(320px, 420px));
+                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
                 gap: 1.5rem;
+                width: 100%;
             }
 
             .video-card {
