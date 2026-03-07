@@ -50,8 +50,14 @@
                 await loadInitialData();
             }
 
-            // 4. Handle first run UI
-            handleFirstRunUI(hasApiKey, hasChannels);
+            // 4. Handle first run UI - use specific methods instead of boolean flags
+            if (!hasApiKey && !hasChannels) {
+                handleWelcomeState();
+            } else if (!hasApiKey) {
+                handleApiKeyMissingState();
+            } else if (!hasChannels) {
+                handleNoChannelsState();
+            }
 
             // 5. Start background refresh (if conditions met)
             if (hasApiKey && hasChannels) {
@@ -95,24 +101,6 @@
         await globalThis.LatestTube.Filters.applyFilters();
     }
 
-    /**
-     * Handle first run UI based on API key and channel state
-     * @param {boolean} hasApiKey
-     * @param {boolean} hasChannels
-     */
-    function handleFirstRunUI(hasApiKey, hasChannels) {
-        if (!hasApiKey && !hasChannels) {
-            handleWelcomeState();
-        } else if (!hasApiKey) {
-            handleApiKeyMissingState();
-        } else if (!hasChannels) {
-            handleNoChannelsState();
-        }
-    }
-
-    /**
-     * Handle welcome state - no API key and no channels
-     */
     function handleWelcomeState() {
         showFirstRunUI('welcome');
     }
