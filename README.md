@@ -1,6 +1,8 @@
 # LatestTube
 
-A browser-only YouTube channel tracker that runs entirely in your browser—no server needed.
+Your personal You Tube Channel tracker - get informed when your favorite channels have new videos available - just this, nothing else. Everything is private to you - everything is stored in your browser indexed DB.
+
+All you need is a You Tube API Key
 
 ## What is LatestTube
 

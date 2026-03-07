@@ -123,7 +123,7 @@ latesttube
 | Severity | Action Required |
 |----------|-----------------|
 | **BLOCKER** | Must fix before completing - blocks deployment |
-| **HIGH** | Should fix - significant code quality impact |
+| **HIGH** | Must fix before completing - significant code quality impact |
 | **MEDIUM** | Should fix - moderate impact on maintainability |
 | **LOW** | Consider fixing - minor improvements |
 | **INFO** | No action needed - informational only |

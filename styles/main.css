@@ -61,6 +61,8 @@
             color: var(--text-primary);
             min-height: 100vh;
             line-height: 1.5;
+            display: flex;
+            flex-direction: column;
         }
 
         /* ========================================
@@ -1766,4 +1768,89 @@
         .toast.success {
             border-color: #4caf50;
             background-color: rgba(76, 175, 80, 0.1);
+        }
+
+        /* ========================================
+           Footer Component
+           ======================================== */
+        .app-footer {
+            background-color: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 1.5rem;
+            margin-top: auto;
+        }
+
+        .footer-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-text {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .footer-link {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .footer-link:hover {
+            opacity: 0.8;
+        }
+
+        .footer-logo {
+            height: 20px;
+            width: auto;
+            display: none;
+        }
+
+        /* Dark theme (default): show white logo, hide black logo */
+        .footer-logo-light {
+            display: none;
+        }
+
+        .footer-logo-dark {
+            display: inline-block;
+        }
+
+        /* Light theme: show black logo, hide white logo */
+        [data-theme="light"] .footer-logo-light {
+            display: inline-block;
+        }
+
+        [data-theme="light"] .footer-logo-dark {
+            display: none;
+        }
+
+        .footer-disclaimer {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-left: 0.5rem;
+        }
+
+        /* Responsive footer */
+        @media (max-width: 768px) {
+            .app-footer {
+                padding: 1rem;
+            }
+
+            .footer-content {
+                gap: 0.5rem;
+            }
+
+            .footer-text,
+            .footer-disclaimer {
+                font-size: 0.75rem;
+            }
+
+            .footer-logo {
+                height: 16px;
+            }
         }
