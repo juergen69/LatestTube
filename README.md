@@ -1,3 +1,8 @@
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=juergen69_LatestTube&metric=alert_status&token=d386dc29f0e34fb051018ed8729e9aa0e405cf97)](https://sonarcloud.io/summary/new_code?id=juergen69_LatestTube)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=juergen69_LatestTube&metric=reliability_rating&token=d386dc29f0e34fb051018ed8729e9aa0e405cf97)](https://sonarcloud.io/summary/new_code?id=juergen69_LatestTube)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=juergen69_LatestTube&metric=security_rating&token=d386dc29f0e34fb051018ed8729e9aa0e405cf97)](https://sonarcloud.io/summary/new_code?id=juergen69_LatestTube)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=juergen69_LatestTube&metric=sqale_rating&token=d386dc29f0e34fb051018ed8729e9aa0e405cf97)](https://sonarcloud.io/summary/new_code?id=juergen69_LatestTube)
+
 # LatestTube
 
 Your personal You Tube Channel tracker - get informed when your favorite channels have new videos available - just this, nothing else. Everything is private to you - everything is stored in your browser indexed DB.
