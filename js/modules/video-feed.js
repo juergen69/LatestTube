@@ -185,6 +185,8 @@
             if (video) {
                 video.watched = watched;
                 await globalThis.LatestTube.DB.videos.update(video);
+                // Persist watched status to survive video being pruned and re-fetched
+                await globalThis.LatestTube.DB.settings.set(`watched_${videoId}`, watched);
                 card.classList.toggle('watched', watched);
                 const checkbox = card.querySelector('.watched-toggle input');
                 if (checkbox) {

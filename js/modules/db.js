@@ -207,6 +207,21 @@
     }
 
     /**
+     * Find the most recent unwatched timestamp from a list of videos
+     * @param {Array} channelVideos - Array of video objects
+     * @returns {Date|null} - Most recent unwatched timestamp or null if none
+     */
+    function findMostRecentUnwatchedTimestamp(channelVideos) {
+        const unwatchedVideos = channelVideos.filter(video => !video.watched);
+        if (unwatchedVideos.length === 0) {
+            return null;
+        }
+        const timestamps = unwatchedVideos.map(video => new Date(video.publishedAt).getTime());
+        const mostRecentTimestamp = Math.max(...timestamps, 0);
+        return new Date(mostRecentTimestamp);
+    }
+
+    /**
      * Migrate videoTags to channelTags
      * @param {IDBTransaction} transaction
      * @param {IDBDatabase} db
@@ -660,6 +675,34 @@
 
                 request.onsuccess = () => {
                     resolve(findMostRecentWatchedTimestamp(request.result));
+                };
+            });
+        },
+
+        /**
+         * Get the timestamp of the most recent unwatched video for a channel
+         * @param {string} channelId
+         * @returns {Promise<Date|null>} - Date of most recent unwatched video, or null if none
+         */
+        getMostRecentUnwatchedTimestamp(channelId) {
+            return new Promise((resolve, reject) => {
+                if (!dbInstance) {
+                    ensureDb().then(() => videos.getMostRecentUnwatchedTimestamp(channelId)).then(resolve).catch(reject);
+                    return;
+                }
+
+                const transaction = dbInstance.transaction([STORES.VIDEOS], 'readonly');
+                const store = transaction.objectStore(STORES.VIDEOS);
+                const index = store.index('channelId');
+                const request = index.getAll(channelId);
+
+                request.onerror = () => {
+                    console.error('IndexedDB: Error getting videos for most recent unwatched timestamp', channelId, request.error);
+                    reject(request.error);
+                };
+
+                request.onsuccess = () => {
+                    resolve(findMostRecentUnwatchedTimestamp(request.result));
                 };
             });
         },

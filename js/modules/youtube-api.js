@@ -411,15 +411,18 @@
      * @param {Date} sixMonthsAgo
      * @param {number} shortsDurationThreshold
      * @param {boolean} includeShorts
-     * @returns {{include: boolean, isShort: boolean, stop: boolean}}
+     * @returns {{include: boolean, isShort: boolean}}
      */
     function shouldIncludeVideo(video, sixMonthsAgo, shortsDurationThreshold, includeShorts) {
         const videoDate = new Date(video.publishedAt);
 
-        // Stop if video is older than sinceDate
+        // Skip if video is older than sinceDate
+        // NOTE: Don't stop pagination here - YouTube playlist order is by when
+        // videos were added to playlist, not by publish date. An old video added
+        // recently could appear before newer videos, so we must fetch all pages.
         if (videoDate < sixMonthsAgo) {
-            console.log(`YouTube API: Stopping pagination - video ${video.videoId} is too old (${video.publishedAt})`);
-            return { include: false, isShort: false, stop: true };
+            console.log(`YouTube API: Skipping old video ${video.videoId} (${video.publishedAt})`);
+            return { include: false, isShort: false };
         }
 
         const isShort = typeof video.durationSeconds === 'number'
@@ -428,10 +431,10 @@
 
         if (!includeShorts && isShort) {
             console.log(`YouTube API: Skipping short video ${video.videoId} (${video.durationSeconds}s <= ${shortsDurationThreshold}s threshold)`);
-            return { include: false, isShort, stop: false };
+            return { include: false, isShort };
         }
 
-        return { include: true, isShort, stop: false };
+        return { include: true, isShort };
     }
 
     /**
@@ -449,12 +452,7 @@
         let stopPagination = false;
 
         for (const video of videos) {
-            const { include, stop } = shouldIncludeVideo(video, sixMonthsAgo, shortsDurationThreshold, includeShorts);
-
-            if (stop) {
-                stopPagination = true;
-                break;
-            }
+            const { include } = shouldIncludeVideo(video, sixMonthsAgo, shortsDurationThreshold, includeShorts);
 
             if (include) {
                 allVideos.push({

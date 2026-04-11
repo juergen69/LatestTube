@@ -94,19 +94,24 @@
     /**
      * Save videos to database
      * @param {Array} videos
-     * @returns {Promise<{addedCount: number, skippedCount: number}>} Counts of added and skipped videos
+     * @returns {Promise<{addedCount: number, restoredCount: number, skippedCount: number}>} Counts of added, restored and skipped videos
      */
     async function saveVideos(videos) {
         let addedCount = 0;
+        let restoredCount = 0;
         let skippedCount = 0;
 
         for (const video of videos) {
-            const exists = await videoExists(video.videoId);
+            const existing = await globalThis.LatestTube.DB.videos.get(video.videoId);
 
-            if (exists) {
+            if (existing) {
                 skippedCount++;
                 continue;
             }
+
+            // Check if this video was previously watched (by checking if a watched timestamp exists in settings)
+            // This prevents watched videos from reappearing as unwatched after being pruned
+            const wasWatched = await globalThis.LatestTube.DB.settings.get(`watched_${video.videoId}`);
 
             const videoRecord = {
                 videoId: video.videoId,
@@ -116,32 +121,57 @@
                 publishedAt: video.publishedAt,
                 description: video.description,
                 durationSeconds: video.durationSeconds ?? null,
-                watched: false
+                watched: wasWatched === true
             };
 
             try {
                 await globalThis.LatestTube.DB.videos.add(videoRecord);
-                addedCount++;
-                console.log(`FetchService: Added video ${video.videoId} - ${video.title.substring(0, 50)}...`);
+                if (wasWatched) {
+                    restoredCount++;
+                    console.log(`FetchService: Restored watched video ${video.videoId} - ${video.title.substring(0, 50)}...`);
+                } else {
+                    addedCount++;
+                    console.log(`FetchService: Added video ${video.videoId} - ${video.title.substring(0, 50)}...`);
+                }
             } catch (error) {
                 console.error(`FetchService: Failed to add video ${video.videoId}`, error);
             }
         }
 
-        return { addedCount, skippedCount };
+        return { addedCount, restoredCount, skippedCount };
     }
 
     /**
      * Prune old videos that are no longer in the channel
+     * Only deletes videos that are older than the cutoff date, not videos that
+     * weren't fetched due to the maxVideosPerChannel limit.
      * @param {string} channelId
      * @param {Set} fetchedVideoIds
+     * @param {Date} sinceDate - Videos newer than this date are kept even if not fetched
      */
-    async function pruneOldVideos(channelId, fetchedVideoIds) {
+    async function pruneOldVideos(channelId, fetchedVideoIds, sinceDate) {
         try {
             const existingVideos = await globalThis.LatestTube.DB.videos.getByChannel(channelId);
             for (const existing of existingVideos) {
-                if (!fetchedVideoIds.has(existing.videoId)) {
-                    await globalThis.LatestTube.DB.videos.delete(existing.videoId);
+                if (fetchedVideoIds.has(existing.videoId)) {
+                    continue; // Video was fetched, keep it
+                }
+
+                const videoDate = new Date(existing.publishedAt);
+                if (videoDate >= sinceDate) {
+                    // Video is newer than cutoff but wasn't fetched (likely due to maxVideosPerChannel limit)
+                    // Keep it in the database to prevent cyclical delete/re-add
+                    console.log(`FetchService: Keeping video ${existing.videoId} - newer than cutoff but not in fetch results`);
+                    continue;
+                }
+
+                // Video is older than cutoff and wasn't fetched - safe to delete
+                await globalThis.LatestTube.DB.videos.delete(existing.videoId);
+                // Clean up watched setting to prevent storage bloat
+                // Only delete if video was watched (setting exists), leave unwatched videos' settings
+                const wasWatched = await globalThis.LatestTube.DB.settings.get(`watched_${existing.videoId}`);
+                if (wasWatched === true) {
+                    await globalThis.LatestTube.DB.settings.delete(`watched_${existing.videoId}`);
                 }
             }
         } catch (error) {
@@ -151,25 +181,34 @@
 
     /**
      * Get the timestamp to use for fetching videos from a channel.
-     * Uses the most recent watched video's timestamp to avoid re-fetching old watched videos.
-     * Falls back to 6 months ago if no watched videos exist.
+     * Uses the most recent unwatched video's timestamp to avoid losing newer unwatched content.
+     * Falls back to most recent watched video, then 6 months ago if no videos exist.
      * @param {string} channelId
      * @returns {Promise<Date>}
      */
     async function getFetchSinceDate(channelId) {
         try {
+            // First, try to use the most recent unwatched video's timestamp
+            // This ensures watching old videos doesn't cause newer unwatched videos to be pruned
+            const mostRecentUnwatched = await globalThis.LatestTube.DB.videos.getMostRecentUnwatchedTimestamp(channelId);
+            if (mostRecentUnwatched) {
+                console.log(`FetchService: Using most recent unwatched timestamp ${mostRecentUnwatched.toISOString()} for channel ${channelId}`);
+                return mostRecentUnwatched;
+            }
+
+            // If no unwatched videos, fall back to the most recent watched timestamp
             const lastWatched = await globalThis.LatestTube.DB.videos.getLastWatchedTimestamp(channelId);
             if (lastWatched) {
-                console.log(`FetchService: Using last watched timestamp ${lastWatched.toISOString()} for channel ${channelId}`);
+                console.log(`FetchService: No unwatched videos, using last watched timestamp ${lastWatched.toISOString()} for channel ${channelId}`);
                 return lastWatched;
             }
         } catch (error) {
-            console.warn(`FetchService: Error getting last watched timestamp for ${channelId}`, error);
+            console.warn(`FetchService: Error getting timestamp for ${channelId}`, error);
         }
 
         // Default: 6 months ago
         const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000);
-        console.log(`FetchService: No watched videos found, using default 6-month cutoff ${sixMonthsAgo.toISOString()}`);
+        console.log(`FetchService: No videos found, using default 6-month cutoff ${sixMonthsAgo.toISOString()}`);
         return sixMonthsAgo;
     }
 
@@ -212,12 +251,12 @@
 
             // Store videos (skip duplicates)
             const fetchedVideoIds = new Set(videos.map(video => video.videoId));
-            const { addedCount, skippedCount } = await saveVideos(videos);
+            const { addedCount, restoredCount, skippedCount } = await saveVideos(videos);
 
             // Prune older videos beyond the newest set
-            await pruneOldVideos(channelId, fetchedVideoIds);
+            await pruneOldVideos(channelId, fetchedVideoIds, sinceDate);
 
-            console.log(`FetchService: Channel ${channelId} refreshed - ${addedCount} added, ${skippedCount} skipped`);
+            console.log(`FetchService: Channel ${channelId} refreshed - ${addedCount} added, ${restoredCount} restored, ${skippedCount} skipped`);
 
             if (options.onChannelComplete) {
                 try {
@@ -225,6 +264,7 @@
                         channelId,
                         channelInfo,
                         addedCount,
+                        restoredCount,
                         skippedCount,
                         totalVideos: videos.length
                     });
@@ -238,6 +278,7 @@
                 channelId,
                 channelInfo,
                 addedCount,
+                restoredCount,
                 skippedCount,
                 totalVideos: videos.length
             };

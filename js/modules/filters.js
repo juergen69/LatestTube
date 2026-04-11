@@ -248,8 +248,10 @@
             }
 
             await Promise.all(
-                unwatchedVideos.map(video => {
+                unwatchedVideos.map(async video => {
                     const updated = { ...video, watched: true };
+                    // Persist watched status to survive video being pruned and re-fetched
+                    await globalThis.LatestTube.DB.settings.set(`watched_${video.videoId}`, true);
                     return globalThis.LatestTube.DB.videos.update(updated);
                 })
             );
