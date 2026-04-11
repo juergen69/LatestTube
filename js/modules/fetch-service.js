@@ -11,20 +11,7 @@
     let isRefreshing = false;
     let refreshAbortController = null;
 
-    /**
-     * Check if a video already exists in the database
-     * @param {string} videoId
-     * @returns {Promise<boolean>}
-     */
-    async function videoExists(videoId) {
-        try {
-            const existing = await globalThis.LatestTube.DB.videos.get(videoId);
-            return !!existing;
-        } catch (error) {
-            console.error('FetchService: Error checking video existence', error);
-            return false;
-        }
-    }
+
 
     /**
      * Get shorts duration threshold from settings
