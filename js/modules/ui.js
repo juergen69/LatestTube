@@ -49,6 +49,10 @@
     const maxVideosInput = document.getElementById('max-videos-input');
     const maxVideosStatus = document.getElementById('max-videos-status');
 
+    // Refresh concurrency setting elements
+    const refreshConcurrencyInput = document.getElementById('refresh-concurrency-input');
+    const refreshConcurrencyStatus = document.getElementById('refresh-concurrency-status');
+
     // Info icon and tooltip elements
     const includeShortsInfo = document.getElementById('include-shorts-info');
     const shortsTooltip = document.getElementById('shorts-tooltip');
@@ -152,6 +156,7 @@
         loadApiKey();
         loadShortsDuration();
         loadMaxVideos();
+        loadRefreshConcurrency();
 
         // Focus first input
         const firstInput = settingsModal.querySelector('input');
@@ -640,7 +645,24 @@
     }
 
     /**
-     * Saves all settings (API key, shorts duration, and max videos per channel)
+     * Loads refresh concurrency setting from IndexedDB
+     */
+    async function loadRefreshConcurrency() {
+        try {
+            const concurrency = await globalThis.LatestTube.DB.settings.get('refreshConcurrency');
+            if (concurrency !== undefined && concurrency !== null && !Number.isNaN(concurrency)) {
+                refreshConcurrencyInput.value = concurrency;
+            } else {
+                refreshConcurrencyInput.value = '3';
+            }
+        } catch (error) {
+            console.error('Settings: Error loading refresh concurrency setting', error);
+            refreshConcurrencyInput.value = '3';
+        }
+    }
+
+    /**
+     * Saves all settings (API key, shorts duration, max videos per channel, and refresh concurrency)
      */
     async function saveSettings() {
         try {
@@ -663,10 +685,17 @@
                 return; // Don't close if maxVideos is invalid
             }
 
+            const refreshConcurrency = Number.parseInt(refreshConcurrencyInput.value, 10);
+            if (Number.isNaN(refreshConcurrency) || refreshConcurrency < 1 || refreshConcurrency > 10) {
+                showStatus(refreshConcurrencyStatus, 'Please enter a valid number (1-10)', 'error');
+                return;
+            }
+
             // Save all settings
             await globalThis.LatestTube.DB.settings.set('apiKey', apiKey);
             await globalThis.LatestTube.DB.settings.set('shortsDuration', duration);
             await globalThis.LatestTube.DB.settings.set('maxVideosPerChannel', maxVideos);
+            await globalThis.LatestTube.DB.settings.set('refreshConcurrency', refreshConcurrency);
 
             // Remove pulse notification from settings button after successful save
             const settingsBtn = document.getElementById('settings-btn');

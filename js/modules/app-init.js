@@ -16,6 +16,56 @@
     // State
     let initialized = false;
     let refreshInProgress = false;
+    const refreshProgress = {
+        activeChannels: new Map(),
+        lastCompletedMessage: ''
+    };
+
+    async function getRefreshConcurrency() {
+        try {
+            const concurrency = await globalThis.LatestTube.DB.settings.get('refreshConcurrency');
+            if (concurrency !== undefined && concurrency !== null && !Number.isNaN(concurrency)) {
+                return Math.max(1, Math.min(Number(concurrency), 10));
+            }
+        } catch (error) {
+            console.warn('App: Failed to load refresh concurrency setting, using default', error);
+        }
+        return 3;
+    }
+
+    function resetRefreshProgress() {
+        refreshProgress.activeChannels.clear();
+        refreshProgress.lastCompletedMessage = '';
+    }
+
+    function renderRefreshActivityStatus() {
+        const activeLabels = Array.from(refreshProgress.activeChannels.values());
+        if (activeLabels.length === 0) {
+            if (refreshProgress.lastCompletedMessage) {
+                showRefreshStatus(refreshProgress.lastCompletedMessage, false);
+            }
+            return;
+        }
+
+        showRefreshStatus({
+            title: activeLabels.length === 1
+                ? 'Checking 1 channel'
+                : `Checking ${activeLabels.length} channels`,
+            items: activeLabels,
+            latest: refreshProgress.lastCompletedMessage
+        }, true);
+    }
+
+    function markChannelRefreshStarted(channelId, label) {
+        refreshProgress.activeChannels.set(channelId, label);
+        renderRefreshActivityStatus();
+    }
+
+    function markChannelRefreshCompleted(channelId, message) {
+        refreshProgress.activeChannels.delete(channelId);
+        refreshProgress.lastCompletedMessage = message;
+        renderRefreshActivityStatus();
+    }
 
     // ========================================
     // Main Initialization
@@ -215,23 +265,28 @@
 
         if (!lastRefresh || lastRefresh < thirtyMinutesAgo) {
             console.log('App: Starting background refresh...');
+            resetRefreshProgress();
             showRefreshStatus('Checking for new videos...', true);
 
             try {
+                const concurrency = await getRefreshConcurrency();
                 const result = await globalThis.LatestTube.FetchService.refreshAllChannels({
-                    concurrency: 3,
+                    concurrency,
                     onChannelStart: async (channelId) => {
                         const label = await resolveChannelLabel(channelId);
-                        showRefreshStatus(`Fetching new videos from ${label}...`, true);
+                        markChannelRefreshStarted(channelId, label);
                     },
                     onChannelComplete: async (info) => {
                         const label = info.channelInfo?.title || await resolveChannelLabel(info.channelId);
                         if (info.addedCount > 0) {
-                            showRefreshStatus(`Added ${info.addedCount} new video${info.addedCount === 1 ? '' : 's'} from ${label}`, true);
+                            markChannelRefreshCompleted(
+                                info.channelId,
+                                `Added ${info.addedCount} new video${info.addedCount === 1 ? '' : 's'} from ${label}`
+                            );
                             await globalThis.LatestTube.VideoFeed.refresh();
                             await globalThis.LatestTube.Filters.renderFilterChips();
                         } else {
-                            showRefreshStatus(`No new videos from ${label}`, true);
+                            markChannelRefreshCompleted(info.channelId, `No new videos from ${label}`);
                         }
                     }
                 });
@@ -262,6 +317,8 @@
                 console.error('App: Background refresh error:', error);
                 showRefreshStatus('Update failed - check settings', false, 'error');
                 setTimeout(() => hideRefreshStatus(), 5000);
+            } finally {
+                resetRefreshProgress();
             }
         } else {
             // Show when last checked
@@ -302,23 +359,28 @@
         refreshInProgress = true;
         refreshBtn.disabled = true;
         refreshBtn.classList.add('refreshing');
+        resetRefreshProgress();
         showRefreshStatus('Refreshing videos...', true);
 
         try {
+            const concurrency = await getRefreshConcurrency();
             const result = await globalThis.LatestTube.FetchService.refreshAllChannels({
-                concurrency: 3,
+                concurrency,
                 onChannelStart: async (channelId) => {
                     const label = await resolveChannelLabel(channelId);
-                    showRefreshStatus(`Fetching new videos from ${label}...`, true);
+                    markChannelRefreshStarted(channelId, label);
                 },
                 onChannelComplete: async (info) => {
                     const label = info.channelInfo?.title || await resolveChannelLabel(info.channelId);
                     if (info.addedCount > 0) {
-                        showRefreshStatus(`Added ${info.addedCount} new video${info.addedCount === 1 ? '' : 's'} from ${label}`, true);
+                        markChannelRefreshCompleted(
+                            info.channelId,
+                            `Added ${info.addedCount} new video${info.addedCount === 1 ? '' : 's'} from ${label}`
+                        );
                         await globalThis.LatestTube.VideoFeed.refresh();
                         await globalThis.LatestTube.Filters.renderFilterChips();
                     } else {
-                        showRefreshStatus(`No new videos from ${label}`, true);
+                        markChannelRefreshCompleted(info.channelId, `No new videos from ${label}`);
                     }
                 }
             });
@@ -358,6 +420,7 @@
             showToast(error.message || 'An error occurred during refresh', 'error');
             setTimeout(() => hideRefreshStatus(), 5000);
         } finally {
+            resetRefreshProgress();
             refreshInProgress = false;
             refreshBtn.disabled = false;
             refreshBtn.classList.remove('refreshing');
@@ -387,7 +450,7 @@
 
     /**
      * Show refresh status in header
-     * @param {string} message - Status message
+     * @param {string|Object} message - Status message or structured refresh activity
      * @param {boolean} showSpinner - Whether to show spinner
      * @param {string} type - 'normal', 'success', or 'error'
      */
@@ -395,7 +458,7 @@
         if (!refreshStatusEl) return;
 
         // Clear existing content
-        refreshStatusEl.textContent = '';
+        refreshStatusEl.replaceChildren();
 
         // Add spinner if needed
         if (showSpinner) {
@@ -404,12 +467,45 @@
             refreshStatusEl.appendChild(spinner);
         }
 
-        // Add message text
-        const messageSpan = document.createElement('span');
-        messageSpan.textContent = message;
-        refreshStatusEl.appendChild(messageSpan);
+        if (message && typeof message === 'object' && !Array.isArray(message)) {
+            const content = document.createElement('div');
+            content.className = 'refresh-status-content';
 
-        refreshStatusEl.style.display = 'inline-flex';
+            if (message.title) {
+                const title = document.createElement('div');
+                title.className = 'refresh-status-title';
+                title.textContent = message.title;
+                content.appendChild(title);
+            }
+
+            if (Array.isArray(message.items) && message.items.length > 0) {
+                const list = document.createElement('ul');
+                list.className = 'refresh-status-list';
+
+                message.items.forEach(label => {
+                    const item = document.createElement('li');
+                    item.textContent = label;
+                    list.appendChild(item);
+                });
+
+                content.appendChild(list);
+            }
+
+            if (message.latest) {
+                const latest = document.createElement('div');
+                latest.className = 'refresh-status-latest';
+                latest.textContent = `Latest: ${message.latest}`;
+                content.appendChild(latest);
+            }
+
+            refreshStatusEl.appendChild(content);
+            refreshStatusEl.style.display = 'flex';
+        } else {
+            const messageSpan = document.createElement('span');
+            messageSpan.textContent = message;
+            refreshStatusEl.appendChild(messageSpan);
+            refreshStatusEl.style.display = 'inline-flex';
+        }
 
         // Update class for styling
         refreshStatusEl.classList.remove('success', 'error');

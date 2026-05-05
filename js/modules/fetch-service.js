@@ -7,6 +7,8 @@
     // Initialize LatestTube namespace
     globalThis.LatestTube = globalThis.LatestTube || {};
 
+    const FETCH_CURSOR_OVERLAP_MS = 5 * 60 * 1000;
+
     // Track ongoing fetch operations
     let isRefreshing = false;
     let refreshAbortController = null;
@@ -27,6 +29,22 @@
             console.warn('FetchService: Could not load shorts duration, using default', error);
         }
         return 60; // Default threshold: 60 seconds
+    }
+
+    /**
+     * Get configured channel refresh concurrency from settings.
+     * @returns {Promise<number>}
+     */
+    async function getRefreshConcurrency() {
+        try {
+            const concurrency = await globalThis.LatestTube.DB.settings.get('refreshConcurrency');
+            if (concurrency !== undefined && concurrency !== null && !Number.isNaN(concurrency)) {
+                return Math.max(1, Math.min(Number(concurrency), 10));
+            }
+        } catch (error) {
+            console.warn('FetchService: Could not load refresh concurrency, using default', error);
+        }
+        return 3;
     }
 
     /**
@@ -54,27 +72,125 @@
      * @param {Object} options
      */
     async function saveChannel(channelId, channelInfo, options) {
-        const channel = {
-            channelId: channelInfo.channelId,
-            title: channelInfo.title,
-            thumbnail: channelInfo.thumbnail,
-            uploadsPlaylistId: channelInfo.uploadsPlaylistId,
-            addedAt: Date.now(),
-            includeShorts: options.includeShorts !== false
-        };
-
         try {
             const existing = await globalThis.LatestTube.DB.channels.get(channelId);
+            const previousLastCheckedAt = Number(existing?.lastCheckedAt) || 0;
+            const previousRetainedOldestPublishedAt = Number(existing?.retainedOldestPublishedAt) || 0;
+            const requestedLastCheckedAt = Number(options.lastCheckedAt) || 0;
+            const requestedRetainedOldestPublishedAt = Number(options.retainedOldestPublishedAt) || 0;
+            const nextLastCheckedAt = requestedLastCheckedAt > 0
+                ? Math.max(previousLastCheckedAt, requestedLastCheckedAt)
+                : previousLastCheckedAt;
+            const channel = {
+                ...existing,
+                channelId: channelInfo.channelId,
+                title: channelInfo.title,
+                thumbnail: channelInfo.thumbnail,
+                uploadsPlaylistId: channelInfo.uploadsPlaylistId,
+                addedAt: existing?.addedAt || Date.now(),
+                includeShorts: options.includeShorts === undefined
+                    ? existing?.includeShorts ?? true
+                    : options.includeShorts,
+                lastCheckedAt: nextLastCheckedAt || undefined,
+                retainedOldestPublishedAt: requestedRetainedOldestPublishedAt || previousRetainedOldestPublishedAt || undefined
+            };
+
             if (!existing) {
                 await globalThis.LatestTube.DB.channels.add(channel);
-            } else if (options.includeShorts !== undefined) {
-                await globalThis.LatestTube.DB.channels.update({
-                    ...existing,
-                    includeShorts: options.includeShorts !== false
-                });
+                return;
             }
+
+            await globalThis.LatestTube.DB.channels.update(channel);
         } catch (error) {
             console.log(`FetchService: Channel ${channelId} already exists or error:`, error.message);
+        }
+    }
+
+    /**
+     * Get the oldest publication date from fetched videos.
+     * Used for pruning without tying deletion to the moving fetch cursor.
+     * @param {Array} videos
+     * @returns {Date|null}
+     */
+    function getOldestVideoDate(videos) {
+        if (!Array.isArray(videos) || videos.length === 0) {
+            return null;
+        }
+
+        let oldestTimestamp = Number.POSITIVE_INFINITY;
+        for (const video of videos) {
+            const publishedTimestamp = new Date(video.publishedAt).getTime();
+            if (Number.isFinite(publishedTimestamp) && publishedTimestamp < oldestTimestamp) {
+                oldestTimestamp = publishedTimestamp;
+            }
+        }
+
+        return Number.isFinite(oldestTimestamp)
+            ? new Date(oldestTimestamp)
+            : null;
+    }
+
+    /**
+     * Return the earlier of two dates.
+     * @param {Date|null} firstDate
+     * @param {Date|null} secondDate
+     * @returns {Date|null}
+     */
+    function getEarlierDate(firstDate, secondDate) {
+        const firstTime = firstDate instanceof Date ? firstDate.getTime() : Number.NaN;
+        const secondTime = secondDate instanceof Date ? secondDate.getTime() : Number.NaN;
+
+        if (!Number.isFinite(firstTime)) {
+            return Number.isFinite(secondTime) ? secondDate : null;
+        }
+
+        if (!Number.isFinite(secondTime)) {
+            return firstDate;
+        }
+
+        return firstTime <= secondTime ? firstDate : secondDate;
+    }
+
+    /**
+     * Return the later of two dates.
+     * @param {Date|null} firstDate
+     * @param {Date|null} secondDate
+     * @returns {Date|null}
+     */
+    function getLaterDate(firstDate, secondDate) {
+        const firstTime = firstDate instanceof Date ? firstDate.getTime() : Number.NaN;
+        const secondTime = secondDate instanceof Date ? secondDate.getTime() : Number.NaN;
+
+        if (!Number.isFinite(firstTime)) {
+            return Number.isFinite(secondTime) ? secondDate : null;
+        }
+
+        if (!Number.isFinite(secondTime)) {
+            return firstDate;
+        }
+
+        return firstTime >= secondTime ? firstDate : secondDate;
+    }
+
+    /**
+     * Get the oldest locally retained video date for a channel.
+     * This acts as a floor so previously pruned history does not get re-added.
+     * @param {string} channelId
+     * @param {Object|null} channelRecord
+     * @returns {Promise<Date|null>}
+     */
+    async function getRetainedVideoHorizon(channelId, channelRecord = null) {
+        const retainedOldestPublishedAt = Number(channelRecord?.retainedOldestPublishedAt);
+        if (Number.isFinite(retainedOldestPublishedAt) && retainedOldestPublishedAt > 0) {
+            return new Date(retainedOldestPublishedAt);
+        }
+
+        try {
+            const existingVideos = await globalThis.LatestTube.DB.videos.getByChannel(channelId);
+            return getOldestVideoDate(existingVideos);
+        } catch (error) {
+            console.warn(`FetchService: Failed to resolve retained horizon for ${channelId}`, error);
+            return null;
         }
     }
 
@@ -134,69 +250,70 @@
      * weren't fetched due to the maxVideosPerChannel limit.
      * @param {string} channelId
      * @param {Set} fetchedVideoIds
-     * @param {Date} sinceDate - Videos newer than this date are kept even if not fetched
+     * @param {Date|null} pruneBeforeDate - Videos newer than this date are kept even if not fetched
      */
-    async function pruneOldVideos(channelId, fetchedVideoIds, sinceDate) {
+    async function pruneOldVideos(channelId, fetchedVideoIds, pruneBeforeDate) {
         try {
             const existingVideos = await globalThis.LatestTube.DB.videos.getByChannel(channelId);
+            const retainedExistingVideos = [];
+            const hasPruneBeforeDate = pruneBeforeDate instanceof Date && !Number.isNaN(pruneBeforeDate.getTime());
+
             for (const existing of existingVideos) {
                 if (fetchedVideoIds.has(existing.videoId)) {
+                    retainedExistingVideos.push(existing);
                     continue; // Video was fetched, keep it
                 }
 
-                const videoDate = new Date(existing.publishedAt);
-                if (videoDate >= sinceDate) {
-                    // Video is newer than cutoff but wasn't fetched (likely due to maxVideosPerChannel limit)
-                    // Keep it in the database to prevent cyclical delete/re-add
-                    console.log(`FetchService: Keeping video ${existing.videoId} - newer than cutoff but not in fetch results`);
+                if (!hasPruneBeforeDate) {
+                    retainedExistingVideos.push(existing);
                     continue;
                 }
 
-                // Video is older than cutoff and wasn't fetched - safe to delete
-                await globalThis.LatestTube.DB.videos.delete(existing.videoId);
-                // Clean up watched setting to prevent storage bloat
-                // Only delete if video was watched (setting exists), leave unwatched videos' settings
-                const wasWatched = await globalThis.LatestTube.DB.settings.get(`watched_${existing.videoId}`);
-                if (wasWatched === true) {
-                    await globalThis.LatestTube.DB.settings.delete(`watched_${existing.videoId}`);
+                const videoDate = new Date(existing.publishedAt);
+                if (videoDate >= pruneBeforeDate) {
+                    // Video is newer than cutoff but wasn't fetched (likely due to maxVideosPerChannel limit)
+                    // Keep it in the database to prevent cyclical delete/re-add
+                    console.log(`FetchService: Keeping video ${existing.videoId} - newer than cutoff but not in fetch results`);
+                    retainedExistingVideos.push(existing);
+                    continue;
                 }
+
+                // Video is older than cutoff and wasn't fetched - safe to delete.
+                // Keep the persisted watched marker so old videos do not reappear as unwatched
+                // if YouTube returns them again in a later refresh.
+                await globalThis.LatestTube.DB.videos.delete(existing.videoId);
             }
+
+            return getOldestVideoDate(retainedExistingVideos);
         } catch (error) {
             console.error('FetchService: Error pruning old videos', error);
+            return null;
         }
     }
 
     /**
      * Get the timestamp to use for fetching videos from a channel.
-     * Uses the most recent unwatched video's timestamp to avoid losing newer unwatched content.
-     * Falls back to most recent watched video, then 6 months ago if no videos exist.
+     * Uses a monotonic per-channel cursor so checks stay fast as history grows.
+     * Falls back to 6 months ago for channels that have never been refreshed.
      * @param {string} channelId
+     * @param {Object|null} channelRecord
      * @returns {Promise<Date>}
      */
-    async function getFetchSinceDate(channelId) {
-        try {
-            // First, try to use the most recent unwatched video's timestamp
-            // This ensures watching old videos doesn't cause newer unwatched videos to be pruned
-            const mostRecentUnwatched = await globalThis.LatestTube.DB.videos.getMostRecentUnwatchedTimestamp(channelId);
-            if (mostRecentUnwatched) {
-                console.log(`FetchService: Using most recent unwatched timestamp ${mostRecentUnwatched.toISOString()} for channel ${channelId}`);
-                return mostRecentUnwatched;
-            }
-
-            // If no unwatched videos, fall back to the most recent watched timestamp
-            const lastWatched = await globalThis.LatestTube.DB.videos.getLastWatchedTimestamp(channelId);
-            if (lastWatched) {
-                console.log(`FetchService: No unwatched videos, using last watched timestamp ${lastWatched.toISOString()} for channel ${channelId}`);
-                return lastWatched;
-            }
-        } catch (error) {
-            console.warn(`FetchService: Error getting timestamp for ${channelId}`, error);
+    async function getFetchSinceDate(channelId, channelRecord = null) {
+        const retainedVideoHorizon = await getRetainedVideoHorizon(channelId, channelRecord);
+        const lastCheckedAt = Number(channelRecord?.lastCheckedAt);
+        if (Number.isFinite(lastCheckedAt) && lastCheckedAt > 0) {
+            const lastCheckedDate = new Date(lastCheckedAt);
+            const sinceDate = getLaterDate(lastCheckedDate, retainedVideoHorizon);
+            console.log(`FetchService: Using fetch cursor ${sinceDate.toISOString()} for channel ${channelId}`);
+            return sinceDate;
         }
 
         // Default: 6 months ago
         const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000);
-        console.log(`FetchService: No videos found, using default 6-month cutoff ${sixMonthsAgo.toISOString()}`);
-        return sixMonthsAgo;
+        const sinceDate = getLaterDate(sixMonthsAgo, retainedVideoHorizon) || sixMonthsAgo;
+        console.log(`FetchService: No cursor found, using fallback cutoff ${sinceDate.toISOString()} for channel ${channelId}`);
+        return sinceDate;
     }
 
     /**
@@ -210,6 +327,7 @@
         console.log(`FetchService: Refreshing channel ${channelId}`);
 
         try {
+            const refreshStartedAt = Date.now();
             // OPTIMIZATION: Check if channel already exists in DB with uploadsPlaylistId.
             // If so, skip the channels.list API call (saves 1 quota unit per channel).
             // Per blog: "Batching reduces costs" — avoiding unnecessary calls is even better.
@@ -218,9 +336,8 @@
             // Get shorts duration threshold from settings
             const shortsDurationThreshold = await getShortsDurationThreshold();
 
-            // Get the timestamp of the most recent watched video to use as fetch starting point
-            // This prevents old watched videos from reappearing after being pruned
-            const sinceDate = await getFetchSinceDate(channelId);
+            // Use a monotonic per-channel cursor so refresh cost does not grow with local history.
+            const sinceDate = await getFetchSinceDate(channelId, cachedChannelInfo);
 
             // Fetch videos (with cached channel info if available)
             const { channelInfo, videos } = await globalThis.LatestTube.YouTube.fetchAllChannelVideos(
@@ -233,15 +350,21 @@
                 }
             );
 
-            // Save channel to database
-            await saveChannel(channelId, channelInfo, options);
-
             // Store videos (skip duplicates)
             const fetchedVideoIds = new Set(videos.map(video => video.videoId));
             const { addedCount, restoredCount, skippedCount } = await saveVideos(videos);
 
-            // Prune older videos beyond the newest set
-            await pruneOldVideos(channelId, fetchedVideoIds, sinceDate);
+            // Prune videos older than the oldest item returned in this refresh.
+            // This keeps the cursor independent from local watch history.
+            const pruneBeforeDate = getOldestVideoDate(videos);
+            const oldestRetainedExistingDate = await pruneOldVideos(channelId, fetchedVideoIds, pruneBeforeDate);
+            const retainedOldestDate = getEarlierDate(pruneBeforeDate, oldestRetainedExistingDate);
+
+            await saveChannel(channelId, channelInfo, {
+                ...options,
+                lastCheckedAt: refreshStartedAt - FETCH_CURSOR_OVERLAP_MS,
+                retainedOldestPublishedAt: retainedOldestDate?.getTime()
+            });
 
             console.log(`FetchService: Channel ${channelId} refreshed - ${addedCount} added, ${restoredCount} restored, ${skippedCount} skipped`);
 
@@ -312,7 +435,8 @@
             let totalAdded = 0;
             let totalSkipped = 0;
 
-            const concurrency = Math.max(1, Math.min(options.concurrency || 3, channels.length));
+            const configuredConcurrency = options.concurrency || await getRefreshConcurrency();
+            const concurrency = Math.max(1, Math.min(configuredConcurrency, channels.length));
             const channelById = new Map(channels.map(channel => [channel.channelId, channel]));
             const queue = channels.map(channel => channel.channelId);
 
